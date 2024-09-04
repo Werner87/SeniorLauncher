@@ -43,7 +43,10 @@
                 <category android:name="android.intent.category.HOME" />
             </intent-filter>
         </activity>
-
+        <activity
+            android:name=".SettingsActivity"
+            android:label="Settings"
+            android:theme="@style/Theme.SeniorApp" />
     </application>
 
 </manifest>
