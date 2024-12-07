@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,47 +43,49 @@ fun AppButton(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
-    var scale by remember { mutableStateOf(1f) }
+    var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    var initialIndex by remember { mutableStateOf(index) }
+    var initialIndex by remember { mutableIntStateOf(index) }
 
     val appIcon = remember(appInfo.packageName) {
         context.packageManager.getApplicationIcon(appInfo.packageName)
     }
 
+    val dragModifier = if (!isDraggingLocked) {
+        Modifier.pointerInput(Unit) {
+            detectDragGestures(
+                onDragStart = {
+                    initialIndex = index
+                },
+                onDrag = { change, dragAmount ->
+                    change.consume()
+                    offset += dragAmount
+                },
+                onDragEnd = {
+                    with(density) {
+                        val x = (offset.x / (160.dp.toPx())).roundToInt()
+                        val y = (offset.y / (160.dp.toPx())).roundToInt()
+                        val newPosition = (initialIndex + y * gridColumnCount + x).coerceIn(0, totalApps - 1)
+                        if (newPosition != initialIndex) {
+                            onReorder(initialIndex, newPosition)
+                        }
+                        offset = Offset.Zero
+                    }
+                }
+            )
+        }
+    } else {
+        Modifier // Brak obsługi przeciągania, gdy zablokowane
+    }
+
     Box(
         modifier = modifier
-            .size(150.dp)  // Increase button size
+            .size(150.dp)  // Rozmiar przycisku
             .padding(8.dp)
-            .pointerInput(Unit) {
-                if (!isDraggingLocked) {
-                    detectDragGestures(
-                        onDragStart = {
-                            initialIndex = index
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            offset += dragAmount
-                        },
-                        onDragEnd = {
-                            with(density) {
-                                val x = (offset.x / (160.dp.toPx())).roundToInt()
-                                val y = (offset.y / (160.dp.toPx())).roundToInt()
-                                val newPosition = (initialIndex + y * gridColumnCount + x).coerceIn(0, totalApps - 1)
-                                if (newPosition != initialIndex) {
-                                    onReorder(initialIndex, newPosition)
-                                }
-                                offset = Offset.Zero
-                            }
-                        }
-                    )
-                }
-            }
+            .then(dragModifier) // Dodanie modyfikatora drag, jeśli odblokowany
             .graphicsLayer(
                 translationX = offset.x,
-                translationY = offset.y,
-                scaleX = scale,
-                scaleY = scale
+                translationY = offset.y
             )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
