@@ -2,6 +2,7 @@ package com.example.seniorapp
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -14,22 +15,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,7 +40,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.map
@@ -47,18 +51,26 @@ import kotlinx.coroutines.flow.map
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Ustawienia transparentnego paska nawigacyjnego
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.setNavigationBarColor(Color.White.toArgb())
+            window.setNavigationBarDividerColor(Color.Black.toArgb())
+        }
+
         setContent {
             SeniorInterface()
         }
     }
 }
-
 @Composable
 fun SeniorInterface() {
     val context = LocalContext.current
 
     var installedApps by remember { mutableStateOf(emptyList<AppInfo>()) }
-    var isDraggingLocked by remember { mutableStateOf(false) }
+    var isDraggingLocked by remember { mutableStateOf(true) }
+    var currentTime by remember { mutableStateOf("") }
+    val clockManager = remember { ClockManager { newTime -> currentTime = newTime } }
 
     // Observe changes to the background color from DataStore
     val backgroundColor by context.dataStore.data
@@ -67,35 +79,48 @@ fun SeniorInterface() {
         }
         .collectAsState(initial = Color.White)
 
-    // Fetch installed apps
     LaunchedEffect(Unit) {
         installedApps = fetchInstalledApps(context)
+        clockManager.startClock()  // Start clock
+    }
+
+    // Stopping the clock when the Composable is disposed
+    DisposableEffect(Unit) {
+        onDispose {
+            clockManager.stopClock()
+        }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundColor) // Use the observed background color
+            .background(backgroundColor)
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
+                .fillMaxSize(),
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                    .padding(5.dp, end=15.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Senior Phone",
-                    fontSize = 30.sp,
-                    color = Color.Black
-                )
+                Box(
+                    modifier = Modifier.padding(start = 15.dp)
+                ) {
+                    Text(
+                        text = currentTime,
+                        fontSize = 50.sp,
+                        color = Color.Black,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.SansSerif,
+                        modifier = Modifier.animateContentSize()
+                    )
+                }
 
                 Icon(
                     imageVector = if (isDraggingLocked) Icons.Filled.Lock else Icons.Filled.LockOpen,
@@ -104,6 +129,17 @@ fun SeniorInterface() {
                         .size(30.dp)
                         .clickable {
                             isDraggingLocked = !isDraggingLocked
+                        }
+                        .animateContentSize(),
+                    tint = Color.Black
+                )
+
+                Icon(
+                    imageVector = Icons.Filled.DeleteOutline,
+                    contentDescription = "Delete",
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clickable {
                         }
                         .animateContentSize(),
                     tint = Color.Black
@@ -121,8 +157,6 @@ fun SeniorInterface() {
                     tint = Color.Black
                 )
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
 
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
@@ -151,8 +185,6 @@ fun SeniorInterface() {
         }
     }
 }
-
-
 fun fetchInstalledApps(context: Context): List<AppInfo> {
     val packageManager = context.packageManager
     val apps = packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).apply {

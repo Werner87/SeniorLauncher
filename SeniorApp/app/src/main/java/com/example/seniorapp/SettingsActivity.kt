@@ -1,6 +1,11 @@
 package com.example.seniorapp
 
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -15,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,6 +55,7 @@ fun ColorPickerScreen() {
     val scope = rememberCoroutineScope()
 
     var selectedColor by remember { mutableStateOf(Color.White) }
+    var isLauncherEnabled by remember { mutableStateOf(isLauncherActive(context)) }
 
     // Fetch and set initial color
     LaunchedEffect(Unit) {
@@ -63,6 +70,14 @@ fun ColorPickerScreen() {
                 preferences[BACKGROUND_COLOR_KEY] = color.toArgb().toLong()
             }
         }
+    }
+
+    fun toggleLauncher(enable: Boolean) {
+        val packageManager = context.packageManager
+        val componentName = ComponentName(context, "com.example.seniorapp.LauncherActivity") // Replace with your launcher activity name
+        val state = if (enable) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        packageManager.setComponentEnabledSetting(componentName, state, PackageManager.DONT_KILL_APP)
+        isLauncherEnabled = enable
     }
 
     Column(
@@ -110,5 +125,41 @@ fun ColorPickerScreen() {
                 }
             }
         }
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Text(
+            text = "Launcher Settings",
+            fontSize = 20.sp,
+            color = Color.Black
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                toggleLauncher(!isLauncherEnabled)
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = if (isLauncherEnabled) "Disable Launcher" else "Enable Launcher")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = "Manage Default Launcher")
+        }
     }
 }
+fun isLauncherActive(context: Context): Boolean {
+    val packageManager = context.packageManager
+    val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+    val resolveInfo = packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
+    return resolveInfo?.activityInfo?.packageName == context.packageName
+}
+
