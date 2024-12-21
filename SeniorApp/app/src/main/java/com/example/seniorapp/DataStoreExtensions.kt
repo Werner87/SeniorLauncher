@@ -8,3 +8,4 @@ import androidx.datastore.preferences.preferencesDataStore
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 val BACKGROUND_COLOR_KEY = longPreferencesKey("background_color")
+val BUTTON_SIZE_KEY = longPreferencesKey("button_size")

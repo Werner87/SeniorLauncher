@@ -79,6 +79,12 @@ fun SeniorInterface() {
         }
         .collectAsState(initial = Color.White)
 
+    val buttonSize by context.dataStore.data
+        .map { preferences ->
+            preferences[BUTTON_SIZE_KEY]?.toInt() ?: 150
+        }
+        .collectAsState(initial = 150)
+
     LaunchedEffect(Unit) {
         installedApps = fetchInstalledApps(context)
         clockManager.startClock()  // Start clock
@@ -178,7 +184,8 @@ fun SeniorInterface() {
                             val app = updatedApps.removeAt(fromIndex)
                             updatedApps.add(toIndex, app)
                             installedApps = updatedApps
-                        }
+                        },
+                        buttonSize = buttonSize
                     )
                 }
             }

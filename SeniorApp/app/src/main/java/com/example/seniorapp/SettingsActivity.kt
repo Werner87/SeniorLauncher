@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -56,14 +57,18 @@ class SettingsActivity : ComponentActivity() {
 fun SettingsScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-
+    val buttonSizeOptions = listOf(120, 150, 170) // Rozmiary przycisków w dp
+    val buttonSizeLabels = listOf("Mały", "Średni", "Duży")
     var selectedColor by remember { mutableStateOf(Color.White) }
     var isLauncherEnabled by remember { mutableStateOf(isLauncherActive(context)) }
+    var selectedButtonSize by remember { mutableIntStateOf(buttonSizeOptions[1]) }
 
     // Fetch and set initial color
     LaunchedEffect(Unit) {
         val colorValue = context.dataStore.data.first()[BACKGROUND_COLOR_KEY] ?: Color.White.toArgb().toLong()
         selectedColor = Color(colorValue)
+        val savedSize = context.dataStore.data.first()[BUTTON_SIZE_KEY] ?: buttonSizeOptions[1].toLong()
+        selectedButtonSize = savedSize.toInt()
     }
 
     val backgroundColor by context.dataStore.data
@@ -80,7 +85,14 @@ fun SettingsScreen() {
             }
         }
     }
-
+    fun updateButtonSize(size: Int) {
+        selectedButtonSize = size
+        scope.launch {
+            context.dataStore.edit { preferences ->
+                preferences[BUTTON_SIZE_KEY] = size.toLong()
+            }
+        }
+    }
     fun toggleLauncher(enable: Boolean) {
         val packageManager = context.packageManager
         val componentName = ComponentName(context, "com.example.seniorapp.LauncherActivity") // Replace with your launcher activity name
@@ -164,6 +176,34 @@ fun SettingsScreen() {
                         fontSize = 12.sp,
                         color = Color.Black
                     )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(30.dp))
+
+        Text(
+            text="Rozmiar przycisków",
+            fontSize = 30.sp,
+            color = Color.Black
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            buttonSizeOptions.forEachIndexed { index, size ->
+                Box(
+                    modifier = Modifier
+                        .size(50.dp)
+                        .background(if (size == selectedButtonSize) Color.LightGray else Color.Transparent)
+                        .clickable { updateButtonSize(size) }
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = buttonSizeLabels[index], fontSize = 12.sp, color = Color.Black)
                 }
             }
         }

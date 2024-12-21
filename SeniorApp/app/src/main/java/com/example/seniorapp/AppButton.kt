@@ -38,6 +38,7 @@ fun AppButton(
     index: Int,
     gridColumnCount: Int,
     totalApps: Int,
+    buttonSize: Int,
     onReorder: (Int, Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -80,7 +81,7 @@ fun AppButton(
 
     Box(
         modifier = modifier
-            .size(150.dp)  // Rozmiar przycisku
+            .size(buttonSize.dp)  // Rozmiar przycisku
             .padding(8.dp)
             .then(dragModifier) // Dodanie modyfikatora drag, jeśli odblokowany
             .graphicsLayer(
