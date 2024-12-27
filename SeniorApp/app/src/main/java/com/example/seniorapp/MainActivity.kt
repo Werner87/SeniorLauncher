@@ -2,6 +2,7 @@ package com.example.seniorapp
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ResolveInfo
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
@@ -194,17 +195,63 @@ fun SeniorInterface() {
 }
 fun fetchInstalledApps(context: Context): List<AppInfo> {
     val packageManager = context.packageManager
+
+    // Pobieramy listę wszystkich aplikacji, które można uruchomić
     val apps = packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).apply {
         addCategory(Intent.CATEGORY_LAUNCHER)
     }, 0)
-    return apps.map { resolveInfo ->
+
+    // Zdefiniuj intencje dla aplikacji priorytetowych
+    val priorityIntents = mapOf(
+        "Telefon" to Intent(Intent.ACTION_DIAL),
+        "Wiadomości" to Intent(Intent.ACTION_SENDTO, android.net.Uri.parse("smsto:")),
+        "Galeria" to Intent(Intent.ACTION_PICK).apply { type = "image/*" },
+        "Aparat" to Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE), //? nwm czy dziala
+        "Kontakty" to Intent(Intent.ACTION_PICK).apply { type = "vnd.android.cursor.dir/contact" },
+        "Zegar" to Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS),
+        "Ustawienia" to Intent(android.provider.Settings.ACTION_SETTINGS)
+    )
+
+    val knownGalleryPackages = listOf(
+        "com.google.android.apps.photos", // Google Photos
+        "com.sec.android.gallery3d", // Samsung Gallery
+        "com.miui.gallery", // Xiaomi Gallery
+        "com.sonyericsson.album", // Sony Album
+        "com.htc.album" // HTC Album
+    )
+
+    val priorityApps = mutableListOf<ResolveInfo>()
+    val otherApps = mutableListOf<ResolveInfo>()
+
+    for (app in apps) {
+        val packageName = app.activityInfo.packageName
+        val isCameraApp = packageManager.resolveActivity(
+            Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE), 0
+        )?.activityInfo?.packageName == packageName
+
+        val isPriorityApp = priorityIntents.values.any { intent ->
+            packageManager.resolveActivity(intent, 0)?.activityInfo?.packageName == packageName
+        } || knownGalleryPackages.contains(packageName)
+
+        if (isCameraApp) {
+            // Dodaj aparat bezpośrednio na koniec listy priorytetowych
+            priorityApps.add(app)
+        } else if (isPriorityApp) {
+            priorityApps.add(app)
+        } else {
+            otherApps.add(app)
+        }
+    }
+
+    val sortedApps = priorityApps + otherApps
+
+    return sortedApps.map { resolveInfo ->
         val packageName = resolveInfo.activityInfo.packageName
         val label = resolveInfo.loadLabel(packageManager).toString()
         val icon = resolveInfo.loadIcon(packageManager)
         AppInfo(packageName, label, icon)
     }
 }
-
 fun openApp(context: Context, packageName: String) {
     val intent = context.packageManager.getLaunchIntentForPackage(packageName)
     if (intent != null) {

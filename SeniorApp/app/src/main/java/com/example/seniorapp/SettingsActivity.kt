@@ -20,7 +20,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Square
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -155,12 +158,12 @@ fun SettingsScreen() {
         ) {
             listOf(
                 Color.White to "White",
-                Color.LightGray to "LightGray",
                 Color.Gray to "Gray",
                 Color(176, 224, 230) to "PowderBlue",
                 Color(199, 21, 133) to "RedViolet",
                 Color(255, 99, 71) to "Tomato",
-                Color(255, 215, 0) to "Gold"
+                Color(255, 215, 0) to "Gold",
+                Color(1, 182, 155, 255) to "Aqua"
 
             ).forEach { (color, label) ->
                 Box(
@@ -203,7 +206,11 @@ fun SettingsScreen() {
                         .padding(8.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = buttonSizeLabels[index], fontSize = 12.sp, color = Color.Black)
+                    when (size) {
+                        120 -> Icon(Icons.Filled.Square, contentDescription = "Mały", tint = Color.Black, modifier = Modifier.size(size=22.dp))
+                        150 -> Icon(Icons.Filled.Square, contentDescription = "Średni", tint = Color.Black, modifier = Modifier.size(size=25.dp))
+                        170 -> Icon(Icons.Filled.Square, contentDescription = "Duży", tint = Color.Black, modifier = Modifier.size(size=27.dp))
+                    }
                 }
             }
         }
