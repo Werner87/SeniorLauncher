@@ -47,6 +47,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.compose.rememberNavController
+import com.example.seniorapp.ui.theme.SeniorAppTheme
 import kotlinx.coroutines.flow.map
 
 class MainActivity : ComponentActivity() {
@@ -60,12 +62,16 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            SeniorInterface()
+            SeniorAppTheme {
+                // Pamiętamy kontroler nawigacji
+                val navController = rememberNavController()
+                AppNavHost(navController = navController)
+            }
         }
     }
 }
 @Composable
-fun SeniorInterface() {
+fun HomePage(onNavigateToSettings: () -> Unit) {
     val context = LocalContext.current
 
     var installedApps by remember { mutableStateOf(emptyList<AppInfo>()) }
@@ -158,7 +164,7 @@ fun SeniorInterface() {
                     modifier = Modifier
                         .size(30.dp)
                         .clickable {
-                            context.startActivity(Intent(context, SettingsActivity::class.java))
+                            onNavigateToSettings()
                         }
                         .animateContentSize(),
                     tint = Color.Black

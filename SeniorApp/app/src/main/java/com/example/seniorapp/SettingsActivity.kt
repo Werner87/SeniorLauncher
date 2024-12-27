@@ -21,9 +21,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Square
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.edit
@@ -51,13 +54,28 @@ class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            SettingsScreen()
+            SettingsScreen(onBackPressed = {
+                // Use the new OnBackPressedDispatcher API
+                onBackPressedDispatcher.onBackPressed()
+            })
         }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+
+        // Sprawdzamy, czy aplikacja została tylko zminimalizowana, a nie zakończona
+        val intent = Intent(this, MainActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+
+        // Nie zamykamy SettingsActivity tutaj, bo chcemy, aby aktywność była
+        // zamknięta, gdy wrócimy do niej z MainActivity.
     }
 }
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(onBackPressed: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val buttonSizeOptions = listOf(120, 150, 170) // Rozmiary przycisków w dp
@@ -112,11 +130,23 @@ fun SettingsScreen() {
         verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "Ustawienia",
-            fontSize = 40.sp,
-            color = Color.Black
-        )
+        // Header with back button on the left
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(),
+        ) {
+            IconButton(onClick = { onBackPressed() }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+            Text(
+                text = "Ustawienia",
+                fontSize = 40.sp,
+                color = Color.Black,
+                modifier = Modifier
+                    .align(Alignment.Center),
+                textAlign = TextAlign.Center
+            )
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -129,17 +159,17 @@ fun SettingsScreen() {
 
             shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp), // Zaokrąglone rogi
             colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color(176,224,230),  // Zmieniamy tło na niebieskie
+                containerColor = Color(1, 1, 3, 47),  // Zmieniamy tło na niebieskie
             )
         ) {
             Text(
                 text = "Wybierz ekran główny",
                 fontSize = 20.sp,  // Text size
-                color = Color.Black
+                color = Color.Black,
             )
         }
 
-        Spacer(modifier = Modifier.height(30.dp))
+        Spacer(modifier = Modifier.height(30.dp ))
 
         Text(
             text = "Kolor tła",
@@ -165,21 +195,14 @@ fun SettingsScreen() {
                 Color(255, 215, 0) to "Gold",
                 Color(1, 182, 155, 255) to "Aqua"
 
-            ).forEach { (color, label) ->
+            ).forEach { (color) ->
                 Box(
                     modifier = Modifier
                         .size(50.dp)
                         .background(color)
                         .clickable { updateBackgroundColor(color) }
                         .padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        fontSize = 12.sp,
-                        color = Color.Black
-                    )
-                }
+                )
             }
         }
         Spacer(modifier = Modifier.height(30.dp))
