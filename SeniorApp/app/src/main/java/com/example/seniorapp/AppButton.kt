@@ -40,6 +40,8 @@ fun AppButton(
     totalApps: Int,
     buttonSize: Int,
     onReorder: (Int, Int) -> Unit,
+    onDeleteClick: () -> Unit,  // Add this parameter
+    isDeleting: Boolean,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -88,7 +90,13 @@ fun AppButton(
                 translationX = offset.x,
                 translationY = offset.y
             )
-            .clickable(onClick = onClick),
+            .clickable {
+                if (isDeleting) {
+                    onDeleteClick()  // Wywołanie usuwania, jeśli tryb usuwania jest aktywny
+                } else {
+                    onClick()  // Normalne kliknięcie, jeśli tryb usuwania nie jest aktywny
+                }
+            },
         contentAlignment = Alignment.Center
     ) {
         Box(

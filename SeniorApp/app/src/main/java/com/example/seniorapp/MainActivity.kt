@@ -3,12 +3,16 @@ package com.example.seniorapp
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ResolveInfo
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +28,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -37,6 +42,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,10 +80,18 @@ class MainActivity : ComponentActivity() {
 fun HomePage(onNavigateToSettings: () -> Unit) {
     val context = LocalContext.current
 
-    var installedApps by remember { mutableStateOf(emptyList<AppInfo>()) }
-    var isDraggingLocked by remember { mutableStateOf(true) }
-    var currentTime by remember { mutableStateOf("") }
+    var installedApps by rememberSaveable { mutableStateOf(emptyList<AppInfo>()) }
+    var isDraggingLocked by rememberSaveable { mutableStateOf(true) }
+    var currentTime by rememberSaveable { mutableStateOf("") }
     val clockManager = remember { ClockManager { newTime -> currentTime = newTime } }
+    var isDeleting by remember { mutableStateOf(false) }
+
+    val onDeleteClick: (AppInfo) -> Unit = { appInfo ->
+        if (isDeleting) {
+            promptUninstallApp(context, appInfo.packageName)
+            installedApps = installedApps.filter { it.packageName != appInfo.packageName }
+        }
+    }
 
     // Observe changes to the background color from DataStore
     val backgroundColor by context.dataStore.data
@@ -92,15 +106,23 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
         }
         .collectAsState(initial = 150)
 
+    // Zainicjuj nasłuchiwanie zmian w aplikacjach
+    val appChangeReceiver = remember { AppChangeReceiver(onAppChanged = {
+        // Zaktualizuj listę aplikacji po instalacji/wyjątku
+        installedApps = fetchInstalledApps(context)
+    }) }
+
     LaunchedEffect(Unit) {
         installedApps = fetchInstalledApps(context)
         clockManager.startClock()  // Start clock
+        appChangeReceiver.register(context)
     }
 
     // Stopping the clock when the Composable is disposed
     DisposableEffect(Unit) {
         onDispose {
             clockManager.stopClock()
+            appChangeReceiver.unregister(context)
         }
     }
 
@@ -118,7 +140,7 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(5.dp, end=15.dp),
+                    .padding(5.dp, end = 15.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -148,11 +170,12 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
                 )
 
                 Icon(
-                    imageVector = Icons.Filled.DeleteOutline,
+                    imageVector = if (isDeleting) Icons.Filled.Delete else Icons.Filled.DeleteOutline,
                     contentDescription = "Delete",
                     modifier = Modifier
                         .size(30.dp)
                         .clickable {
+                            isDeleting = !isDeleting
                         }
                         .animateContentSize(),
                     tint = Color.Black
@@ -174,30 +197,44 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(8.dp),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f)
+                modifier = Modifier.fillMaxSize().weight(1f)
             ) {
                 itemsIndexed(installedApps) { index, appInfo ->
-                    AppButton(
-                        appInfo = appInfo,
-                        onClick = { openApp(context, appInfo.packageName) },
-                        isDraggingLocked = isDraggingLocked,
-                        index = index,
-                        gridColumnCount = 2,
-                        totalApps = installedApps.size,
-                        onReorder = { fromIndex, toIndex ->
-                            val updatedApps = installedApps.toMutableList()
-                            val app = updatedApps.removeAt(fromIndex)
-                            updatedApps.add(toIndex, app)
-                            installedApps = updatedApps
-                        },
-                        buttonSize = buttonSize
-                    )
+                    AnimatedVisibility(
+                        visible = !isDeleting || installedApps.contains(appInfo),
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        AppButton(
+                            appInfo = appInfo,
+                            onClick = { openApp(context, appInfo.packageName) },
+                            isDraggingLocked = isDraggingLocked,
+                            index = index,
+                            gridColumnCount = 2,
+                            totalApps = installedApps.size,
+                            onReorder = { fromIndex, toIndex ->
+                                val updatedApps = installedApps.toMutableList()
+                                val app = updatedApps.removeAt(fromIndex)
+                                updatedApps.add(toIndex, app)
+                                installedApps = updatedApps
+                            },
+                            buttonSize = buttonSize,
+                            onDeleteClick = {
+                                onDeleteClick(appInfo)
+                            },
+                            isDeleting = isDeleting
+                        )
+                    }
                 }
             }
         }
     }
+}
+fun promptUninstallApp(context: Context, packageName: String) {
+    val intent = Intent(Intent.ACTION_DELETE)
+    intent.data = Uri.parse("package:$packageName")
+    context.startActivity(intent)
+    Toast.makeText(context, "Uninstalling $packageName", Toast.LENGTH_SHORT).show()
 }
 fun fetchInstalledApps(context: Context): List<AppInfo> {
     val packageManager = context.packageManager

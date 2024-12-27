@@ -3,6 +3,8 @@ package com.example.seniorapp
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -16,8 +18,20 @@ fun AppNavHost(navController: NavHostController) {
     ) {
         composable(
             "home",
-            enterTransition = { fadeIn(tween(1000)) },
-            exitTransition = { fadeOut(tween(1000)) }
+            enterTransition = {
+                // Fade in and slide in from bottom
+                fadeIn(tween(800)) + slideInHorizontally(
+                    initialOffsetX = { 1000 }, // Start from the right
+                    animationSpec = tween(800)
+                )
+            },
+            exitTransition = {
+                // Fade out and slide out to top
+                fadeOut(tween(800)) + slideOutHorizontally(
+                    targetOffsetX = { -1000 }, // Slide out to the left
+                    animationSpec = tween(800)
+                )
+            }
         ) {
             HomePage(onNavigateToSettings = {
                 navController.navigate("settings")
@@ -25,8 +39,20 @@ fun AppNavHost(navController: NavHostController) {
         }
         composable(
             "settings",
-            enterTransition = { fadeIn(tween(1000)) },
-            exitTransition = { fadeOut(tween(1000)) }
+            enterTransition = {
+                // Fade in and slide in from bottom
+                fadeIn(tween(800)) + slideInHorizontally(
+                    initialOffsetX = { 1000 }, // Start from the right
+                    animationSpec = tween(800)
+                )
+            },
+            exitTransition = {
+                // Fade out and slide out to top
+                fadeOut(tween(800)) + slideOutHorizontally(
+                    targetOffsetX = { -1000 }, // Slide out to the left
+                    animationSpec = tween(800)
+                )
+            }
         ) {
             SettingsScreen(onBackPressed = {
                 navController.popBackStack()
