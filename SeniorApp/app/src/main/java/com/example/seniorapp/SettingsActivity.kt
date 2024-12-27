@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +21,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Square
@@ -59,18 +63,6 @@ class SettingsActivity : ComponentActivity() {
                 onBackPressedDispatcher.onBackPressed()
             })
         }
-    }
-
-    override fun onUserLeaveHint() {
-        super.onUserLeaveHint()
-
-        // Sprawdzamy, czy aplikacja została tylko zminimalizowana, a nie zakończona
-        val intent = Intent(this, MainActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-
-        // Nie zamykamy SettingsActivity tutaj, bo chcemy, aby aktywność była
-        // zamknięta, gdy wrócimy do niej z MainActivity.
     }
 }
 
@@ -159,7 +151,7 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
 
             shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp), // Zaokrąglone rogi
             colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color(1, 1, 3, 47),  // Zmieniamy tło na niebieskie
+                containerColor = Color(1, 1, 3, 47),
             )
         ) {
             Text(
@@ -179,26 +171,28 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(6), // Możesz zmienić liczbę kolumn, jeśli chcesz
+            contentPadding = PaddingValues(8.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            listOf(
+            items(listOf(
                 Color.White to "White",
                 Color.Gray to "Gray",
                 Color(176, 224, 230) to "PowderBlue",
                 Color(199, 21, 133) to "RedViolet",
                 Color(255, 99, 71) to "Tomato",
                 Color(255, 215, 0) to "Gold",
-                Color(1, 182, 155, 255) to "Aqua"
-
-            ).forEach { (color) ->
+                Color(1, 182, 155, 255) to "Aqua",
+                Color(9, 23, 143, 255) to "DarkBlue",
+                Color(56, 129, 3, 255) to "Green",
+                Color(139, 0, 0, 255) to "DarkRed",
+                Color(103, 58, 183, 255) to "Purple",
+                Color(189, 0, 0, 255) to "Red",
+            )) { (color, _) ->
                 Box(
                     modifier = Modifier
-                        .size(50.dp)
+                        .size(55.dp)
                         .background(color)
                         .clickable { updateBackgroundColor(color) }
                         .padding(8.dp),
@@ -224,7 +218,7 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
                 Box(
                     modifier = Modifier
                         .size(50.dp)
-                        .background(if (size == selectedButtonSize) Color.LightGray else Color.Transparent)
+                        .background(if (size == selectedButtonSize) Color(1, 1, 3, 47) else Color.Transparent)
                         .clickable { updateButtonSize(size) }
                         .padding(8.dp),
                     contentAlignment = Alignment.Center
