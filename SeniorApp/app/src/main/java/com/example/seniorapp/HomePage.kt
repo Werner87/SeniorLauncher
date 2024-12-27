@@ -107,7 +107,7 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
-            .padding(top = 20.dp)
+            .padding(top = 40.dp)
     ) {
         Column(
             modifier = Modifier
