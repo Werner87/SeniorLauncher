@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,17 +39,19 @@ fun AppButton(
     totalApps: Int,
     buttonSize: Int,
     onReorder: (Int, Int) -> Unit,
+    onDeleteClick: () -> Unit,
+    isDeleting: Boolean,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
-    var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var initialIndex by remember { mutableIntStateOf(index) }
 
-    val appIcon = remember(appInfo.packageName) {
+    val appIconDrawable = remember(appInfo.packageName) {
         context.packageManager.getApplicationIcon(appInfo.packageName)
     }
+    val appIconBitmap = appIconDrawable.toBitmap()
 
     val dragModifier = if (!isDraggingLocked) {
         Modifier.pointerInput(Unit) {
@@ -88,7 +89,13 @@ fun AppButton(
                 translationX = offset.x,
                 translationY = offset.y
             )
-            .clickable(onClick = onClick),
+            .clickable {
+                if (isDeleting) {
+                    onDeleteClick()  // Wywołanie usuwania, jeśli tryb usuwania jest aktywny
+                } else {
+                    onClick()  // Normalne kliknięcie, jeśli tryb usuwania nie jest aktywny
+                }
+            },
         contentAlignment = Alignment.Center
     ) {
         Box(
@@ -97,7 +104,7 @@ fun AppButton(
                 .background(Color.Transparent)
         ) {
             Image(
-                bitmap = appIcon.toBitmap().asImageBitmap(),
+                bitmap = appIconBitmap.asImageBitmap(),
                 contentDescription = appInfo.label,
                 modifier = Modifier.fillMaxSize()
             )

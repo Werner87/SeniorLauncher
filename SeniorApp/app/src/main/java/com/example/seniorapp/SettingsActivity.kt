@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,7 +21,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Square
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.edit
@@ -48,13 +58,16 @@ class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            SettingsScreen()
+            SettingsScreen(onBackPressed = {
+                // Use the new OnBackPressedDispatcher API
+                onBackPressedDispatcher.onBackPressed()
+            })
         }
     }
 }
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(onBackPressed: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val buttonSizeOptions = listOf(120, 150, 170) // Rozmiary przycisków w dp
@@ -105,15 +118,27 @@ fun SettingsScreen() {
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
-            .padding(16.dp),
+            .padding(top = 40.dp),
         verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "Ustawienia",
-            fontSize = 40.sp,
-            color = Color.Black
-        )
+        // Header with back button on the left
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(),
+        ) {
+            IconButton(onClick = { onBackPressed() }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+            Text(
+                text = "Ustawienia",
+                fontSize = 40.sp,
+                color = Color.Black,
+                modifier = Modifier
+                    .align(Alignment.Center),
+                textAlign = TextAlign.Center
+            )
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -126,17 +151,17 @@ fun SettingsScreen() {
 
             shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp), // Zaokrąglone rogi
             colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color(176,224,230),  // Zmieniamy tło na niebieskie
+                containerColor = Color(1, 1, 3, 47),
             )
         ) {
             Text(
                 text = "Wybierz ekran główny",
                 fontSize = 20.sp,  // Text size
-                color = Color.Black
+                color = Color.Black,
             )
         }
 
-        Spacer(modifier = Modifier.height(30.dp))
+        Spacer(modifier = Modifier.height(30.dp ))
 
         Text(
             text = "Kolor tła",
@@ -146,37 +171,32 @@ fun SettingsScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(6), // Możesz zmienić liczbę kolumn, jeśli chcesz
+            contentPadding = PaddingValues(8.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            listOf(
+            items(listOf(
                 Color.White to "White",
-                Color.LightGray to "LightGray",
                 Color.Gray to "Gray",
                 Color(176, 224, 230) to "PowderBlue",
                 Color(199, 21, 133) to "RedViolet",
                 Color(255, 99, 71) to "Tomato",
-                Color(255, 215, 0) to "Gold"
-
-            ).forEach { (color, label) ->
+                Color(255, 215, 0) to "Gold",
+                Color(1, 182, 155, 255) to "Aqua",
+                Color(9, 23, 143, 255) to "DarkBlue",
+                Color(56, 129, 3, 255) to "Green",
+                Color(139, 0, 0, 255) to "DarkRed",
+                Color(103, 58, 183, 255) to "Purple",
+                Color(189, 0, 0, 255) to "Red",
+            )) { (color, _) ->
                 Box(
                     modifier = Modifier
-                        .size(50.dp)
+                        .size(55.dp)
                         .background(color)
                         .clickable { updateBackgroundColor(color) }
                         .padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        fontSize = 12.sp,
-                        color = Color.Black
-                    )
-                }
+                )
             }
         }
         Spacer(modifier = Modifier.height(30.dp))
@@ -198,12 +218,16 @@ fun SettingsScreen() {
                 Box(
                     modifier = Modifier
                         .size(50.dp)
-                        .background(if (size == selectedButtonSize) Color.LightGray else Color.Transparent)
+                        .background(if (size == selectedButtonSize) Color(1, 1, 3, 47) else Color.Transparent)
                         .clickable { updateButtonSize(size) }
                         .padding(8.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = buttonSizeLabels[index], fontSize = 12.sp, color = Color.Black)
+                    when (size) {
+                        120 -> Icon(Icons.Filled.Square, contentDescription = "Mały", tint = Color.Black, modifier = Modifier.size(size=22.dp))
+                        150 -> Icon(Icons.Filled.Square, contentDescription = "Średni", tint = Color.Black, modifier = Modifier.size(size=25.dp))
+                        170 -> Icon(Icons.Filled.Square, contentDescription = "Duży", tint = Color.Black, modifier = Modifier.size(size=27.dp))
+                    }
                 }
             }
         }
