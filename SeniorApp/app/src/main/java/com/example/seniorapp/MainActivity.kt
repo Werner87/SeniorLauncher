@@ -3,6 +3,8 @@ package com.example.seniorapp
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ResolveInfo
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color.TRANSPARENT
 import android.net.Uri
 import android.os.Bundle
@@ -20,6 +22,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -54,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -117,6 +121,8 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
     var currentTime by rememberSaveable { mutableStateOf("") }
     val clockManager = remember { ClockManager { newTime -> currentTime = newTime } }
     var isDeleting by remember { mutableStateOf(false) }
+    var backgroundImageBitmap by rememberSaveable { mutableStateOf<Bitmap?>(null) }
+    var isImageBackground by remember { mutableStateOf(false) }
 
     val onDeleteClick: (AppInfo) -> Unit = { appInfo ->
         if (isDeleting) {
@@ -124,6 +130,13 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
             installedApps = installedApps.filter { it.packageName != appInfo.packageName }
         }
     }
+    isImageBackground = backgroundImageBitmap != null
+
+    val backgroundImageUri by context.dataStore.data
+        .map { preferences ->
+            preferences[BACKGROUND_IMAGE_URI_KEY] ?: ""
+        }
+        .collectAsState(initial = "")
 
     // Observe changes to the background color from DataStore
     val backgroundColor by context.dataStore.data
@@ -150,6 +163,20 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
         appChangeReceiver.register(context)
     }
 
+    LaunchedEffect(backgroundImageUri) {
+        if (backgroundImageUri.isNotEmpty()) {
+            try {
+                val uri = Uri.parse(backgroundImageUri)
+                val inputStream = context.contentResolver.openInputStream(uri)
+                backgroundImageBitmap = BitmapFactory.decodeStream(inputStream)
+            } catch (e: Exception) {
+                backgroundImageBitmap = null
+            }
+        } else {
+            backgroundImageBitmap = null
+        }
+    }
+
     // Stopping the clock when the Composable is disposed
     DisposableEffect(Unit) {
         onDispose {
@@ -161,9 +188,23 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundColor)
-            .padding(top = 40.dp)
+            .background(if (backgroundImageBitmap != null) Color.Transparent else backgroundColor)
     ) {
+        // Wyświetlanie obrazu tła tylko, gdy jest dostępny
+        if (isImageBackground && backgroundImageBitmap != null) {
+            Image(
+                bitmap = backgroundImageBitmap!!.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(backgroundColor)
+                    .padding(top = 20.dp)
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize(),
@@ -173,7 +214,7 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(5.dp, end = 15.dp),
+                    .padding(5.dp, top = 25.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -230,7 +271,9 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(8.dp),
-                modifier = Modifier.fillMaxSize().weight(1f)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f)
             ) {
                 itemsIndexed(installedApps) { index, appInfo ->
                     AnimatedVisibility(

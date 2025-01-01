@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SeniorLauncher</string>
+    <string name="settings">Ustawienia</string>
+    <string name="choose_background_image">Wybierz zdjęcie tła</string>
+    <string name="choose_home_screen">Wybierz ekran główny</string>
+    <string name="change_language">Zmień język</string>
+    <string name="background_color">Kolor tła</string>
+    <string name="button_size">Rozmiar przycisków</string>
+    <string name="small">Mały</string>
+    <string name="medium">Średni</string>
+    <string name="large">Duży</string>
+</resources>

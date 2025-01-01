@@ -31,7 +31,7 @@ import kotlin.math.roundToInt
 
 @Composable
 fun AppButton(
-    appInfo: com.example.seniorapp.AppInfo,
+    appInfo: AppInfo,
     onClick: () -> Unit,
     isDraggingLocked: Boolean,
     index: Int,
