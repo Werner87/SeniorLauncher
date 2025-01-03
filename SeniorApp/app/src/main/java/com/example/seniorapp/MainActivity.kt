@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -54,6 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -70,9 +72,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.datastore.preferences.core.edit
 import androidx.navigation.compose.rememberNavController
 import com.example.seniorapp.ui.theme.SeniorAppTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class MainActivity : ComponentActivity() {
@@ -132,6 +136,10 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
     var backgroundImageBitmap by rememberSaveable { mutableStateOf<Bitmap?>(null) }
     var isImageBackground by remember { mutableStateOf(false) }
     var scale by remember { mutableFloatStateOf(1f) }
+    val listState = rememberLazyGridState()  // To track scroll position
+    val isScrolled by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 }
+    }
 
     val scaleAnim = animateFloatAsState(
         targetValue = scale,
@@ -142,8 +150,6 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
     val onDeleteClick: (AppInfo) -> Unit = { appInfo ->
         if (isDeleting) {
             promptUninstallApp(context, appInfo.packageName)
-            installedApps = installedApps.filter { it.packageName != appInfo.packageName }
-            filteredApps = filteredApps.filter { it.packageName != appInfo.packageName }
         }
     }
     isImageBackground = backgroundImageBitmap != null
@@ -154,7 +160,6 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
         }
         .collectAsState(initial = "")
 
-    // Observe changes to the background color from DataStore
     val backgroundColor by context.dataStore.data
         .map { preferences ->
             preferences[BACKGROUND_COLOR_KEY]?.let { Color(it) } ?: Color.White
@@ -167,7 +172,30 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
         }
         .collectAsState(initial = 150)
 
-    // Zainicjuj nasłuchiwanie zmian w aplikacjach
+    suspend fun saveAppPositions(context: Context, appPositions: List<AppInfo>) {
+        val preferences = context.dataStore
+        val serializedAppPositions = appPositions.joinToString(",") { it.packageName }
+        preferences.edit { preferences ->
+            preferences[APP_POSITION_KEY] = serializedAppPositions
+        }
+    }
+
+    suspend fun loadAppPositions(context: Context): List<AppInfo> {
+        val preferences = context.dataStore
+        val savedPositions = preferences.data
+            .map { it[APP_POSITION_KEY] ?: "" }
+            .first()
+
+        if (savedPositions.isNotEmpty()) {
+            val packageNames = savedPositions.split(",")
+            return fetchInstalledApps(context).filter { app ->
+                packageNames.contains(app.packageName)
+            }
+        }
+
+        return fetchInstalledApps(context) // Default order
+    }
+
     val packageChangedReceiver = remember {
         object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
@@ -190,7 +218,7 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
-        installedApps = fetchInstalledApps(context)
+        installedApps = loadAppPositions(context)
         filteredApps = installedApps
         clockManager.startClock()
         context.registerReceiver(
@@ -240,6 +268,10 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
             clockManager.stopClock()
             context.unregisterReceiver(packageChangedReceiver)
         }
+    }
+
+    LaunchedEffect(filteredApps) {
+        saveAppPositions(context, filteredApps)
     }
 
     Box(
@@ -330,16 +362,23 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
                     tint = Color.Black
                 )
             }
+            AnimatedVisibility(
+                visible = !isScrolled,  // Show when not scrolled
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 15.dp, end = 15.dp, top = 10.dp)
+            ) {
             TextField(
                 value = searchText,
                 onValueChange = { newText -> searchText = newText },
                 placeholder = { Text("Search apps...") },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start=15.dp, end=15.dp, top = 10.dp),
+                    .fillMaxWidth(),
                 singleLine = true
             )
+            }
             LazyVerticalGrid(
+                state = listState,
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(8.dp),
                 modifier = Modifier
@@ -382,7 +421,6 @@ fun promptUninstallApp(context: Context, packageName: String) {
     val intent = Intent(Intent.ACTION_DELETE)
     intent.data = Uri.parse("package:$packageName")
     context.startActivity(intent)
-    Toast.makeText(context, "Uninstalling $packageName", Toast.LENGTH_SHORT).show()
 }
 fun fetchInstalledApps(context: Context): List<AppInfo> {
     val packageManager = context.packageManager
