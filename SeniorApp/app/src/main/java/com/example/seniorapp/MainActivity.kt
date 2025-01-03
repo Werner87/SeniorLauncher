@@ -1,7 +1,9 @@
 package com.example.seniorapp
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -20,6 +22,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
@@ -45,17 +49,20 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -65,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.rememberNavController
 import com.example.seniorapp.ui.theme.SeniorAppTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 
 class MainActivity : ComponentActivity() {
@@ -72,7 +80,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
 
-        // Ustawienia transparentnego paska nawigacyjnego
         val lightTransparentStyle = SystemBarStyle.light(
             scrim = TRANSPARENT,
             darkScrim = TRANSPARENT
@@ -84,7 +91,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             SeniorAppTheme {
-                // Pamiętamy kontroler nawigacji
                 val navController = rememberNavController()
 
                 // Handle back press navigation
@@ -117,17 +123,27 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
     val context = LocalContext.current
 
     var installedApps by rememberSaveable { mutableStateOf(emptyList<AppInfo>()) }
+    var filteredApps by rememberSaveable { mutableStateOf(emptyList<AppInfo>()) }
+    var searchText by rememberSaveable { mutableStateOf("") }
     var isDraggingLocked by rememberSaveable { mutableStateOf(true) }
     var currentTime by rememberSaveable { mutableStateOf("") }
     val clockManager = remember { ClockManager { newTime -> currentTime = newTime } }
     var isDeleting by remember { mutableStateOf(false) }
     var backgroundImageBitmap by rememberSaveable { mutableStateOf<Bitmap?>(null) }
     var isImageBackground by remember { mutableStateOf(false) }
+    var scale by remember { mutableFloatStateOf(1f) }
+
+    val scaleAnim = animateFloatAsState(
+        targetValue = scale,
+        animationSpec = tween(durationMillis = 150, easing = { it * it }),
+        label = "scaleAnimation"
+    )
 
     val onDeleteClick: (AppInfo) -> Unit = { appInfo ->
         if (isDeleting) {
             promptUninstallApp(context, appInfo.packageName)
             installedApps = installedApps.filter { it.packageName != appInfo.packageName }
+            filteredApps = filteredApps.filter { it.packageName != appInfo.packageName }
         }
     }
     isImageBackground = backgroundImageBitmap != null
@@ -152,15 +168,50 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
         .collectAsState(initial = 150)
 
     // Zainicjuj nasłuchiwanie zmian w aplikacjach
-    val appChangeReceiver = remember { AppChangeReceiver(onAppChanged = {
-        // Zaktualizuj listę aplikacji po instalacji/wyjątku
-        installedApps = fetchInstalledApps(context)
-    }) }
+    val packageChangedReceiver = remember {
+        object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val action = intent.action
+                if (action == Intent.ACTION_PACKAGE_ADDED ||
+                    action == Intent.ACTION_PACKAGE_REMOVED ||
+                    action == Intent.ACTION_PACKAGE_CHANGED
+                ) {
+                    installedApps = fetchInstalledApps(context)
+                    filteredApps = if (searchText.isEmpty()) {
+                        installedApps
+                    } else {
+                        installedApps.filter {
+                            it.label.contains(searchText, ignoreCase = true)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         installedApps = fetchInstalledApps(context)
-        clockManager.startClock()  // Start clock
-        appChangeReceiver.register(context)
+        filteredApps = installedApps
+        clockManager.startClock()
+        context.registerReceiver(
+            packageChangedReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_PACKAGE_ADDED)
+                addAction(Intent.ACTION_PACKAGE_REMOVED)
+                addAction(Intent.ACTION_PACKAGE_CHANGED)
+                addDataScheme("package")
+            }
+        )
+    }
+
+    LaunchedEffect(searchText) {
+        filteredApps = if (searchText.isEmpty()) {
+            installedApps
+        } else {
+            installedApps.filter {
+                it.label.contains(searchText, ignoreCase = true)
+            }
+        }
     }
 
     LaunchedEffect(backgroundImageUri) {
@@ -177,11 +228,17 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
         }
     }
 
+    LaunchedEffect(scale) {
+        // Odczekaj chwilę, aby animacja została ukończona, potem zresetuj skalowanie
+        delay(150)
+        scale = 1f
+    }
+
     // Stopping the clock when the Composable is disposed
     DisposableEffect(Unit) {
         onDispose {
             clockManager.stopClock()
-            appChangeReceiver.unregister(context)
+            context.unregisterReceiver(packageChangedReceiver)
         }
     }
 
@@ -214,20 +271,20 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(5.dp, top = 25.dp),
+                    .padding(start = 15.dp, top = 35.dp, end = 15.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    modifier = Modifier.padding(start = 15.dp)
                 ) {
                     Text(
                         text = currentTime,
-                        fontSize = 50.sp,
+                        fontSize = 55.sp,
                         color = Color.Black,
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = FontFamily.SansSerif,
-                        modifier = Modifier.animateContentSize()
+                        modifier = Modifier
+                            .animateContentSize()
                     )
                 }
 
@@ -238,8 +295,10 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
                         .size(40.dp)
                         .clickable {
                             isDraggingLocked = !isDraggingLocked
+                            scale = 1.1f
                         }
-                        .animateContentSize(),
+                        .animateContentSize()
+                        .scale(scaleAnim.value),
                     tint = Color.Black
                 )
 
@@ -250,8 +309,10 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
                         .size(40.dp)
                         .clickable {
                             isDeleting = !isDeleting
+                            scale = 1.1f
                         }
-                        .animateContentSize(),
+                        .animateContentSize()
+                        .scale(scaleAnim.value),
                     tint = Color.Black
                 )
 
@@ -262,12 +323,22 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
                         .size(40.dp)
                         .clickable {
                             onNavigateToSettings()
+                            scale = 1.1f
                         }
-                        .animateContentSize(),
+                        .animateContentSize()
+                        .scale(scaleAnim.value),
                     tint = Color.Black
                 )
             }
-
+            TextField(
+                value = searchText,
+                onValueChange = { newText -> searchText = newText },
+                placeholder = { Text("Search apps...") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start=15.dp, end=15.dp, top = 10.dp),
+                singleLine = true
+            )
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(8.dp),
@@ -275,7 +346,7 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
                     .fillMaxSize()
                     .weight(1f)
             ) {
-                itemsIndexed(installedApps) { index, appInfo ->
+                itemsIndexed(filteredApps) { index, appInfo ->
                     AnimatedVisibility(
                         visible = !isDeleting || installedApps.contains(appInfo),
                         enter = fadeIn(),
@@ -292,7 +363,7 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
                                 val updatedApps = installedApps.toMutableList()
                                 val app = updatedApps.removeAt(fromIndex)
                                 updatedApps.add(toIndex, app)
-                                installedApps = updatedApps
+                                filteredApps = updatedApps
                             },
                             buttonSize = buttonSize,
                             onDeleteClick = {
@@ -354,7 +425,6 @@ fun fetchInstalledApps(context: Context): List<AppInfo> {
         } || knownGalleryPackages.contains(packageName)
 
         if (isCameraApp) {
-            // Dodaj aparat bezpośrednio na koniec listy priorytetowych
             priorityApps.add(app)
         } else if (isPriorityApp) {
             priorityApps.add(app)
