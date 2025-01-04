@@ -418,9 +418,26 @@ fun fetchInstalledApps(context: Context): List<AppInfo> {
     val knownGalleryPackages = listOf(
         "com.google.android.apps.photos", // Google Photos
         "com.sec.android.gallery3d", // Samsung Gallery
+        "com.sec.android.app.camera", // Samsung Camera Gallery
         "com.miui.gallery", // Xiaomi Gallery
         "com.sonyericsson.album", // Sony Album
-        "com.htc.album" // HTC Album
+        "com.htc.album", // HTC Album
+        "com.huawei.photos", // Huawei Gallery
+        "com.huawei.hidisk", // Huawei Gallery with cloud integration
+        "com.oneplus.gallery", // OnePlus Gallery
+        "com.coloros.gallery", // Oppo Gallery
+        "com.vivo.gallery", // Vivo Gallery
+        "com.realme.gallery", // Realme Gallery
+        "com.lge.gallery", // LG Gallery
+        "com.motorola.MotGallery2", // Motorola Gallery
+        "com.asus.gallery", // Asus Gallery
+        "com.hmdglobal.app.gallery", // Nokia Gallery
+        "cn.nubia.gallery", // ZTE Gallery
+        "com.lenovo.scg", // Lenovo Gallery
+        "com.micromax.gallery", // Micromax Gallery
+        "com.yulong.android.gallery", // Coolpad Gallery
+        "com.meizu.media.gallery", // Meizu Gallery
+        "com.transsion.gallery" // Transsion Gallery (Infinix, TECNO, Itel)
     )
 
     val priorityApps = mutableListOf<ResolveInfo>()
