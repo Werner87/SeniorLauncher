@@ -337,7 +337,7 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
                 )
             }
             AnimatedVisibility(
-                visible = !isScrolled,  // Show when not scrolled
+                visible = !isScrolled,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 15.dp, end = 15.dp, top = 10.dp)
