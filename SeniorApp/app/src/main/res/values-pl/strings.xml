@@ -10,4 +10,5 @@
     <string name="small">Mały</string>
     <string name="medium">Średni</string>
     <string name="large">Duży</string>
+    <string name="search">Szukaj aplikacji…</string>
 </resources>

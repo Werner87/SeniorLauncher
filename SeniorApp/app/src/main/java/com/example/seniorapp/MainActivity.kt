@@ -1,5 +1,6 @@
 package com.example.seniorapp
 
+import AnimatedIcon
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -28,7 +29,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,7 +37,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -48,7 +47,6 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -64,10 +62,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -136,7 +134,7 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
     var backgroundImageBitmap by rememberSaveable { mutableStateOf<Bitmap?>(null) }
     var isImageBackground by remember { mutableStateOf(false) }
     var scale by remember { mutableFloatStateOf(1f) }
-    val listState = rememberLazyGridState()  // To track scroll position
+    val listState = rememberLazyGridState()
     val isScrolled by remember {
         derivedStateOf { listState.firstVisibleItemIndex > 0 }
     }
@@ -193,7 +191,7 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
             }
         }
 
-        return fetchInstalledApps(context) // Default order
+        return fetchInstalledApps(context)
     }
 
     val packageChangedReceiver = remember {
@@ -320,46 +318,22 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
                     )
                 }
 
-                Icon(
+                AnimatedIcon(
                     imageVector = if (isDraggingLocked) Icons.Filled.Lock else Icons.Filled.LockOpen,
                     contentDescription = if (isDraggingLocked) "Unlock" else "Lock",
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clickable {
-                            isDraggingLocked = !isDraggingLocked
-                            scale = 1.1f
-                        }
-                        .animateContentSize()
-                        .scale(scaleAnim.value),
-                    tint = Color.Black
+                    onClick = { isDraggingLocked = !isDraggingLocked }
                 )
 
-                Icon(
+                AnimatedIcon(
                     imageVector = if (isDeleting) Icons.Filled.Delete else Icons.Filled.DeleteOutline,
                     contentDescription = "Delete",
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clickable {
-                            isDeleting = !isDeleting
-                            scale = 1.1f
-                        }
-                        .animateContentSize()
-                        .scale(scaleAnim.value),
-                    tint = Color.Black
+                    onClick = { isDeleting = !isDeleting }
                 )
 
-                Icon(
+                AnimatedIcon(
                     imageVector = Icons.Filled.Settings,
                     contentDescription = "Settings",
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clickable {
-                            onNavigateToSettings()
-                            scale = 1.1f
-                        }
-                        .animateContentSize()
-                        .scale(scaleAnim.value),
-                    tint = Color.Black
+                    onClick = { onNavigateToSettings() }
                 )
             }
             AnimatedVisibility(
@@ -371,7 +345,7 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
             TextField(
                 value = searchText,
                 onValueChange = { newText -> searchText = newText },
-                placeholder = { Text("Search apps...") },
+                placeholder = { Text(text = stringResource(id = R.string.search))},
                 modifier = Modifier
                     .fillMaxWidth(),
                 singleLine = true
