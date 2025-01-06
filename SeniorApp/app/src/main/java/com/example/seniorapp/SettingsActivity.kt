@@ -1,13 +1,16 @@
 package com.example.seniorapp
 
-import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,12 +47,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.edit
+import com.example.seniorapp.ui.theme.Typography
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -71,10 +77,40 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val buttonSizeOptions = listOf(120, 150, 170) // Rozmiary przycisków w dp
-    val buttonSizeLabels = listOf("Mały", "Średni", "Duży")
     var selectedColor by remember { mutableStateOf(Color.White) }
-    var isLauncherEnabled by remember { mutableStateOf(isLauncherActive(context)) }
     var selectedButtonSize by remember { mutableIntStateOf(buttonSizeOptions[1]) }
+    var backgroundImage by remember { mutableStateOf<Bitmap?>(null) }
+    var isImageBackground by remember { mutableStateOf(false) }
+
+    fun setBackgroundImage(bitmap: Bitmap?) {
+        backgroundImage = bitmap
+        isImageBackground = bitmap != null
+    }
+
+    fun updateBackgroundImageUri(uri: String) {
+        scope.launch {
+            context.dataStore.edit { preferences ->
+                preferences[BACKGROUND_IMAGE_URI_KEY] = uri
+            }
+        }
+    }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+        onResult = { uri ->
+            uri?.let {
+                try {
+                    val inputStream = context.contentResolver.openInputStream(it)
+                    val bitmap = BitmapFactory.decodeStream(inputStream)
+                    setBackgroundImage(bitmap)
+                    updateBackgroundImageUri(uri.toString())
+                    inputStream?.close()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    )
 
     // Fetch and set initial color
     LaunchedEffect(Unit) {
@@ -82,6 +118,19 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
         selectedColor = Color(colorValue)
         val savedSize = context.dataStore.data.first()[BUTTON_SIZE_KEY] ?: buttonSizeOptions[1].toLong()
         selectedButtonSize = savedSize.toInt()
+
+
+        val savedImageUri = context.dataStore.data.first()[BACKGROUND_IMAGE_URI_KEY]
+        if (savedImageUri != null) {
+            try {
+                val inputStream = context.contentResolver.openInputStream(Uri.parse(savedImageUri))
+                backgroundImage = BitmapFactory.decodeStream(inputStream)
+                isImageBackground = true
+                inputStream?.close()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     val backgroundColor by context.dataStore.data
@@ -92,12 +141,14 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
 
     fun updateBackgroundColor(color: Color) {
         selectedColor = color // Immediately update UI
+        isImageBackground = false
         scope.launch {
             context.dataStore.edit { preferences ->
                 preferences[BACKGROUND_COLOR_KEY] = color.toArgb().toLong()
             }
         }
     }
+
     fun updateButtonSize(size: Int) {
         selectedButtonSize = size
         scope.launch {
@@ -106,138 +157,141 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
             }
         }
     }
-    fun toggleLauncher(enable: Boolean) {
-        val packageManager = context.packageManager
-        val componentName = ComponentName(context, "com.example.seniorapp.LauncherActivity") // Replace with your launcher activity name
-        val state = if (enable) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-        packageManager.setComponentEnabledSetting(componentName, state, PackageManager.DONT_KILL_APP)
-        isLauncherEnabled = enable
-    }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundColor)
-            .padding(top = 40.dp),
-        verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(if (isImageBackground) Color.Transparent else backgroundColor)
     ) {
-        // Header with back button on the left
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(),
-        ) {
-            IconButton(onClick = { onBackPressed() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-            }
-            Text(
-                text = "Ustawienia",
-                fontSize = 40.sp,
-                color = Color.Black,
-                modifier = Modifier
-                    .align(Alignment.Center),
-                textAlign = TextAlign.Center
+        // Wyświetlanie obrazu tła tylko, gdy isImageBackground jest true
+        if (isImageBackground && backgroundImage != null) {
+            Image(
+                bitmap = backgroundImage!!.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize()
             )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        OutlinedButton(
-            onClick = {
-                context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-            },
+        Column(
             modifier = Modifier
-                .fillMaxWidth(),
-
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp), // Zaokrąglone rogi
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color(1, 1, 3, 47),
-            )
+                .fillMaxSize()
+                .padding(top = 40.dp),
+            verticalArrangement = Arrangement.Top,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "Wybierz ekran główny",
-                fontSize = 20.sp,  // Text size
-                color = Color.Black,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(30.dp ))
-
-        Text(
-            text = "Kolor tła",
-            fontSize = 30.sp,
-            color = Color.Black
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(6), // Możesz zmienić liczbę kolumn, jeśli chcesz
-            contentPadding = PaddingValues(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            items(listOf(
-                Color.White to "White",
-                Color.Gray to "Gray",
-                Color(176, 224, 230) to "PowderBlue",
-                Color(199, 21, 133) to "RedViolet",
-                Color(255, 99, 71) to "Tomato",
-                Color(255, 215, 0) to "Gold",
-                Color(1, 182, 155, 255) to "Aqua",
-                Color(9, 23, 143, 255) to "DarkBlue",
-                Color(56, 129, 3, 255) to "Green",
-                Color(139, 0, 0, 255) to "DarkRed",
-                Color(103, 58, 183, 255) to "Purple",
-                Color(189, 0, 0, 255) to "Red",
-            )) { (color, _) ->
-                Box(
-                    modifier = Modifier
-                        .size(55.dp)
-                        .background(color)
-                        .clickable { updateBackgroundColor(color) }
-                        .padding(8.dp),
+            // Header with back button
+            Box(modifier = Modifier.fillMaxWidth()) {
+                IconButton(onClick = { onBackPressed() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+                Text(
+                    text = stringResource(id = R.string.settings),
+                    style = Typography.titleLarge,
+                    color = Color.Black,
+                    modifier = Modifier.align(Alignment.Center),
+                    textAlign = TextAlign.Center
                 )
             }
-        }
-        Spacer(modifier = Modifier.height(30.dp))
 
-        Text(
-            text="Rozmiar przycisków",
-            fontSize = 30.sp,
-            color = Color.Black
-        )
+            Spacer(modifier = Modifier.height(32.dp))
 
-        Spacer(modifier = Modifier.height(16.dp))
+            // Choose background image button
+            OutlinedButton(
+                onClick = {
+                    imagePickerLauncher.launch("image/*")
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(1, 1, 3, 47))
+            ) {
+                Text(text = stringResource(id = R.string.choose_background_image), style = Typography.labelSmall, color = Color.Black)
+            }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            buttonSizeOptions.forEachIndexed { index, size ->
-                Box(
-                    modifier = Modifier
-                        .size(50.dp)
-                        .background(if (size == selectedButtonSize) Color(1, 1, 3, 47) else Color.Transparent)
-                        .clickable { updateButtonSize(size) }
-                        .padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    when (size) {
-                        120 -> Icon(Icons.Filled.Square, contentDescription = "Mały", tint = Color.Black, modifier = Modifier.size(size=22.dp))
-                        150 -> Icon(Icons.Filled.Square, contentDescription = "Średni", tint = Color.Black, modifier = Modifier.size(size=25.dp))
-                        170 -> Icon(Icons.Filled.Square, contentDescription = "Duży", tint = Color.Black, modifier = Modifier.size(size=27.dp))
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Settings for main screen
+            OutlinedButton(
+                onClick = {
+                    context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(1, 1, 3, 47))
+            ) {
+                Text(text = stringResource(id = R.string.choose_home_screen), style = Typography.labelSmall, color = Color.Black)
+            }
+
+            Spacer(modifier = Modifier.height(30.dp))
+
+            Text(text = stringResource(id = R.string.background_color), style = Typography.bodyLarge, color = Color.Black)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(6),
+                contentPadding = PaddingValues(15.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(listOf(
+                    Color.White to "White",
+                    Color.Gray to "Gray",
+                    Color(176, 224, 230) to "PowderBlue",
+                    Color(199, 21, 133) to "RedViolet",
+                    Color(255, 99, 71) to "Tomato",
+                    Color(255, 215, 0) to "Gold",
+                    Color(1, 182, 155, 255) to "Aqua",
+                    Color(9, 23, 143, 255) to "DarkBlue",
+                    Color(56, 129, 3, 255) to "Green",
+                    Color(139, 0, 0, 255) to "DarkRed",
+                    Color(103, 58, 183, 255) to "Purple",
+                    Color(189, 0, 0, 255) to "Red"
+                )) { (color, _) ->
+                    Box(
+                        modifier = Modifier
+                            .size(55.dp)
+                            .background(color)
+                            .clickable { updateBackgroundColor(color) }
+                            .padding(8.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(30.dp))
+
+            Text(text = stringResource(id = R.string.button_size), style = Typography.bodyLarge, color = Color.Black)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                buttonSizeOptions.forEachIndexed { index, size ->
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .background(if (size == selectedButtonSize) Color(1, 1, 3, 47) else Color.Transparent)
+                            .clickable { updateButtonSize(size) }
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        when (size) {
+                            120 -> Icon(Icons.Filled.Square, contentDescription = "Mały", tint = Color.Black, modifier = Modifier.size(22.dp))
+                            150 -> Icon(Icons.Filled.Square, contentDescription = "Średni", tint = Color.Black, modifier = Modifier.size(25.dp))
+                            170 -> Icon(Icons.Filled.Square, contentDescription = "Duży", tint = Color.Black, modifier = Modifier.size(27.dp))
+                        }
                     }
                 }
             }
         }
     }
 }
-fun isLauncherActive(context: Context): Boolean {
-    val packageManager = context.packageManager
-    val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-    val resolveInfo = packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
-    return resolveInfo?.activityInfo?.packageName == context.packageName
+
+@Preview(showBackground = true)
+@Composable
+fun DefaultPreview() {
+    SettingsScreen(onBackPressed = {})
 }
 
 

@@ -3,6 +3,8 @@ package com.example.seniorapp
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,9 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,11 +31,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
 fun AppButton(
-    appInfo: com.example.seniorapp.AppInfo,
+    appInfo: AppInfo,
     onClick: () -> Unit,
     isDraggingLocked: Boolean,
     index: Int,
@@ -47,23 +53,34 @@ fun AppButton(
     val density = LocalDensity.current
     var offset by remember { mutableStateOf(Offset.Zero) }
     var initialIndex by remember { mutableIntStateOf(index) }
+    var scale by remember { mutableFloatStateOf(1f) }
+
+    val scaleAnim by animateFloatAsState(
+        targetValue = scale,
+        animationSpec = tween(durationMillis = 150),
+        label = "scaleAnimation"
+    )
 
     val appIconDrawable = remember(appInfo.packageName) {
         context.packageManager.getApplicationIcon(appInfo.packageName)
     }
     val appIconBitmap = appIconDrawable.toBitmap()
 
+    val coroutineScope = rememberCoroutineScope()
+
     val dragModifier = if (!isDraggingLocked) {
         Modifier.pointerInput(Unit) {
             detectDragGestures(
                 onDragStart = {
                     initialIndex = index
+                    coroutineScope.launch { scale = 1.1f }
                 },
                 onDrag = { change, dragAmount ->
                     change.consume()
                     offset += dragAmount
                 },
                 onDragEnd = {
+                    coroutineScope.launch { scale = 1f }
                     with(density) {
                         val x = (offset.x / (160.dp.toPx())).roundToInt()
                         val y = (offset.y / (160.dp.toPx())).roundToInt()
@@ -77,7 +94,7 @@ fun AppButton(
             )
         }
     } else {
-        Modifier // Brak obsługi przeciągania, gdy zablokowane
+        Modifier
     }
 
     Box(
@@ -87,13 +104,20 @@ fun AppButton(
             .then(dragModifier) // Dodanie modyfikatora drag, jeśli odblokowany
             .graphicsLayer(
                 translationX = offset.x,
-                translationY = offset.y
+                translationY = offset.y,
+                scaleX = scaleAnim,
+                scaleY = scaleAnim
             )
             .clickable {
-                if (isDeleting) {
-                    onDeleteClick()  // Wywołanie usuwania, jeśli tryb usuwania jest aktywny
-                } else {
-                    onClick()  // Normalne kliknięcie, jeśli tryb usuwania nie jest aktywny
+                coroutineScope.launch {
+                    if (isDeleting) {
+                        onDeleteClick()
+                    } else {
+                        scale = 1.1f
+                        delay(150)
+                        scale = 1f
+                        onClick()
+                    }
                 }
             },
         contentAlignment = Alignment.Center

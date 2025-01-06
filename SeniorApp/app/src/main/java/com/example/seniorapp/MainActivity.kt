@@ -1,8 +1,13 @@
 package com.example.seniorapp
 
+import AnimatedIcon
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ResolveInfo
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color.TRANSPARENT
 import android.net.Uri
 import android.os.Bundle
@@ -18,10 +23,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,23 +37,25 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -54,13 +63,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.datastore.preferences.core.edit
 import androidx.navigation.compose.rememberNavController
 import com.example.seniorapp.ui.theme.SeniorAppTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class MainActivity : ComponentActivity() {
@@ -68,7 +82,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
 
-        // Ustawienia transparentnego paska nawigacyjnego
         val lightTransparentStyle = SystemBarStyle.light(
             scrim = TRANSPARENT,
             darkScrim = TRANSPARENT
@@ -80,7 +93,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             SeniorAppTheme {
-                // Pamiętamy kontroler nawigacji
                 val navController = rememberNavController()
 
                 // Handle back press navigation
@@ -113,19 +125,39 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
     val context = LocalContext.current
 
     var installedApps by rememberSaveable { mutableStateOf(emptyList<AppInfo>()) }
+    var filteredApps by rememberSaveable { mutableStateOf(emptyList<AppInfo>()) }
+    var searchText by rememberSaveable { mutableStateOf("") }
     var isDraggingLocked by rememberSaveable { mutableStateOf(true) }
     var currentTime by rememberSaveable { mutableStateOf("") }
     val clockManager = remember { ClockManager { newTime -> currentTime = newTime } }
     var isDeleting by remember { mutableStateOf(false) }
+    var backgroundImageBitmap by rememberSaveable { mutableStateOf<Bitmap?>(null) }
+    var isImageBackground by remember { mutableStateOf(false) }
+    var scale by remember { mutableFloatStateOf(1f) }
+    val listState = rememberLazyGridState()
+    val isScrolled by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 }
+    }
+
+    val scaleAnim = animateFloatAsState(
+        targetValue = scale,
+        animationSpec = tween(durationMillis = 150, easing = { it * it }),
+        label = "scaleAnimation"
+    )
 
     val onDeleteClick: (AppInfo) -> Unit = { appInfo ->
         if (isDeleting) {
             promptUninstallApp(context, appInfo.packageName)
-            installedApps = installedApps.filter { it.packageName != appInfo.packageName }
         }
     }
+    isImageBackground = backgroundImageBitmap != null
 
-    // Observe changes to the background color from DataStore
+    val backgroundImageUri by context.dataStore.data
+        .map { preferences ->
+            preferences[BACKGROUND_IMAGE_URI_KEY] ?: ""
+        }
+        .collectAsState(initial = "")
+
     val backgroundColor by context.dataStore.data
         .map { preferences ->
             preferences[BACKGROUND_COLOR_KEY]?.let { Color(it) } ?: Color.White
@@ -138,32 +170,128 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
         }
         .collectAsState(initial = 150)
 
-    // Zainicjuj nasłuchiwanie zmian w aplikacjach
-    val appChangeReceiver = remember { AppChangeReceiver(onAppChanged = {
-        // Zaktualizuj listę aplikacji po instalacji/wyjątku
-        installedApps = fetchInstalledApps(context)
-    }) }
+    suspend fun saveAppPositions(context: Context, appPositions: List<AppInfo>) {
+        val preferences = context.dataStore
+        val serializedAppPositions = appPositions.joinToString(",") { it.packageName }
+        preferences.edit { preferences ->
+            preferences[APP_POSITION_KEY] = serializedAppPositions
+        }
+    }
+
+    suspend fun loadAppPositions(context: Context): List<AppInfo> {
+        val preferences = context.dataStore
+        val savedPositions = preferences.data
+            .map { it[APP_POSITION_KEY] ?: "" }
+            .first()
+
+        if (savedPositions.isNotEmpty()) {
+            val packageNames = savedPositions.split(",")
+            return fetchInstalledApps(context).filter { app ->
+                packageNames.contains(app.packageName)
+            }
+        }
+
+        return fetchInstalledApps(context)
+    }
+
+    val packageChangedReceiver = remember {
+        object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val action = intent.action
+                if (action == Intent.ACTION_PACKAGE_ADDED ||
+                    action == Intent.ACTION_PACKAGE_REMOVED ||
+                    action == Intent.ACTION_PACKAGE_CHANGED
+                ) {
+                    installedApps = fetchInstalledApps(context)
+                    filteredApps = if (searchText.isEmpty()) {
+                        installedApps
+                    } else {
+                        installedApps.filter {
+                            it.label.contains(searchText, ignoreCase = true)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
-        installedApps = fetchInstalledApps(context)
-        clockManager.startClock()  // Start clock
-        appChangeReceiver.register(context)
+        installedApps = loadAppPositions(context)
+        filteredApps = installedApps
+        clockManager.startClock()
+        context.registerReceiver(
+            packageChangedReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_PACKAGE_ADDED)
+                addAction(Intent.ACTION_PACKAGE_REMOVED)
+                addAction(Intent.ACTION_PACKAGE_CHANGED)
+                addDataScheme("package")
+            }
+        )
+    }
+
+    LaunchedEffect(searchText) {
+        filteredApps = if (searchText.isEmpty()) {
+            installedApps
+        } else {
+            installedApps.filter {
+                it.label.contains(searchText, ignoreCase = true)
+            }
+        }
+    }
+
+    LaunchedEffect(backgroundImageUri) {
+        if (backgroundImageUri.isNotEmpty()) {
+            try {
+                val uri = Uri.parse(backgroundImageUri)
+                val inputStream = context.contentResolver.openInputStream(uri)
+                backgroundImageBitmap = BitmapFactory.decodeStream(inputStream)
+            } catch (e: Exception) {
+                backgroundImageBitmap = null
+            }
+        } else {
+            backgroundImageBitmap = null
+        }
+    }
+
+    LaunchedEffect(scale) {
+        // Odczekaj chwilę, aby animacja została ukończona, potem zresetuj skalowanie
+        delay(150)
+        scale = 1f
     }
 
     // Stopping the clock when the Composable is disposed
     DisposableEffect(Unit) {
         onDispose {
             clockManager.stopClock()
-            appChangeReceiver.unregister(context)
+            context.unregisterReceiver(packageChangedReceiver)
         }
+    }
+
+    LaunchedEffect(filteredApps) {
+        saveAppPositions(context, filteredApps)
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundColor)
-            .padding(top = 40.dp)
+            .background(if (backgroundImageBitmap != null) Color.Transparent else backgroundColor)
     ) {
+        // Wyświetlanie obrazu tła tylko, gdy jest dostępny
+        if (isImageBackground && backgroundImageBitmap != null) {
+            Image(
+                bitmap = backgroundImageBitmap!!.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(backgroundColor)
+                    .padding(top = 20.dp)
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize(),
@@ -173,66 +301,65 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(5.dp, end = 15.dp),
+                    .padding(start = 15.dp, top = 35.dp, end = 15.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    modifier = Modifier.padding(start = 15.dp)
                 ) {
                     Text(
                         text = currentTime,
-                        fontSize = 50.sp,
+                        fontSize = 55.sp,
                         color = Color.Black,
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = FontFamily.SansSerif,
-                        modifier = Modifier.animateContentSize()
+                        modifier = Modifier
+                            .animateContentSize()
                     )
                 }
 
-                Icon(
+                AnimatedIcon(
                     imageVector = if (isDraggingLocked) Icons.Filled.Lock else Icons.Filled.LockOpen,
                     contentDescription = if (isDraggingLocked) "Unlock" else "Lock",
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clickable {
-                            isDraggingLocked = !isDraggingLocked
-                        }
-                        .animateContentSize(),
-                    tint = Color.Black
+                    onClick = { isDraggingLocked = !isDraggingLocked }
                 )
 
-                Icon(
+                AnimatedIcon(
                     imageVector = if (isDeleting) Icons.Filled.Delete else Icons.Filled.DeleteOutline,
                     contentDescription = "Delete",
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clickable {
-                            isDeleting = !isDeleting
-                        }
-                        .animateContentSize(),
-                    tint = Color.Black
+                    onClick = { isDeleting = !isDeleting }
                 )
 
-                Icon(
+                AnimatedIcon(
                     imageVector = Icons.Filled.Settings,
                     contentDescription = "Settings",
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clickable {
-                            onNavigateToSettings()
-                        }
-                        .animateContentSize(),
-                    tint = Color.Black
+                    onClick = { onNavigateToSettings() }
                 )
             }
-
+            AnimatedVisibility(
+                visible = !isScrolled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 15.dp, end = 15.dp, top = 10.dp)
+            ) {
+            TextField(
+                value = searchText,
+                onValueChange = { newText -> searchText = newText },
+                placeholder = { Text(text = stringResource(id = R.string.search))},
+                modifier = Modifier
+                    .fillMaxWidth(),
+                singleLine = true
+            )
+            }
             LazyVerticalGrid(
+                state = listState,
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(8.dp),
-                modifier = Modifier.fillMaxSize().weight(1f)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f)
             ) {
-                itemsIndexed(installedApps) { index, appInfo ->
+                itemsIndexed(filteredApps) { index, appInfo ->
                     AnimatedVisibility(
                         visible = !isDeleting || installedApps.contains(appInfo),
                         enter = fadeIn(),
@@ -249,7 +376,7 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
                                 val updatedApps = installedApps.toMutableList()
                                 val app = updatedApps.removeAt(fromIndex)
                                 updatedApps.add(toIndex, app)
-                                installedApps = updatedApps
+                                filteredApps = updatedApps
                             },
                             buttonSize = buttonSize,
                             onDeleteClick = {
@@ -268,7 +395,6 @@ fun promptUninstallApp(context: Context, packageName: String) {
     val intent = Intent(Intent.ACTION_DELETE)
     intent.data = Uri.parse("package:$packageName")
     context.startActivity(intent)
-    Toast.makeText(context, "Uninstalling $packageName", Toast.LENGTH_SHORT).show()
 }
 fun fetchInstalledApps(context: Context): List<AppInfo> {
     val packageManager = context.packageManager
@@ -292,9 +418,26 @@ fun fetchInstalledApps(context: Context): List<AppInfo> {
     val knownGalleryPackages = listOf(
         "com.google.android.apps.photos", // Google Photos
         "com.sec.android.gallery3d", // Samsung Gallery
+        "com.sec.android.app.camera", // Samsung Camera Gallery
         "com.miui.gallery", // Xiaomi Gallery
         "com.sonyericsson.album", // Sony Album
-        "com.htc.album" // HTC Album
+        "com.htc.album", // HTC Album
+        "com.huawei.photos", // Huawei Gallery
+        "com.huawei.hidisk", // Huawei Gallery with cloud integration
+        "com.oneplus.gallery", // OnePlus Gallery
+        "com.coloros.gallery", // Oppo Gallery
+        "com.vivo.gallery", // Vivo Gallery
+        "com.realme.gallery", // Realme Gallery
+        "com.lge.gallery", // LG Gallery
+        "com.motorola.MotGallery2", // Motorola Gallery
+        "com.asus.gallery", // Asus Gallery
+        "com.hmdglobal.app.gallery", // Nokia Gallery
+        "cn.nubia.gallery", // ZTE Gallery
+        "com.lenovo.scg", // Lenovo Gallery
+        "com.micromax.gallery", // Micromax Gallery
+        "com.yulong.android.gallery", // Coolpad Gallery
+        "com.meizu.media.gallery", // Meizu Gallery
+        "com.transsion.gallery" // Transsion Gallery (Infinix, TECNO, Itel)
     )
 
     val priorityApps = mutableListOf<ResolveInfo>()
@@ -311,7 +454,6 @@ fun fetchInstalledApps(context: Context): List<AppInfo> {
         } || knownGalleryPackages.contains(packageName)
 
         if (isCameraApp) {
-            // Dodaj aparat bezpośrednio na koniec listy priorytetowych
             priorityApps.add(app)
         } else if (isPriorityApp) {
             priorityApps.add(app)
