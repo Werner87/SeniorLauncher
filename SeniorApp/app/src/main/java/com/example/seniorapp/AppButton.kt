@@ -68,40 +68,44 @@ fun AppButton(
 
     val coroutineScope = rememberCoroutineScope()
 
-    val dragModifier = if (!isDraggingLocked) {
-        Modifier.pointerInput(Unit) {
-            detectDragGestures(
-                onDragStart = {
-                    initialIndex = index
-                    coroutineScope.launch { scale = 1.1f }
-                },
-                onDrag = { change, dragAmount ->
-                    change.consume()
-                    offset += dragAmount
-                },
-                onDragEnd = {
-                    coroutineScope.launch { scale = 1f }
-                    with(density) {
-                        val x = (offset.x / (160.dp.toPx())).roundToInt()
-                        val y = (offset.y / (160.dp.toPx())).roundToInt()
-                        val newPosition = (initialIndex + y * gridColumnCount + x).coerceIn(0, totalApps - 1)
-                        if (newPosition != initialIndex) {
-                            onReorder(initialIndex, newPosition)
+    // Custom drag modifier function
+    val dragModifier = remember(isDraggingLocked) {
+        if (!isDraggingLocked) {
+            Modifier.pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = {
+                        initialIndex = index
+                        coroutineScope.launch { scale = 1.1f }
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        offset += dragAmount
+                    },
+                    onDragEnd = {
+                        coroutineScope.launch { scale = 1f }
+                        with(density) {
+                            val x = (offset.x / (160.dp.toPx())).roundToInt()
+                            val y = (offset.y / (160.dp.toPx())).roundToInt()
+                            val newPosition = (initialIndex + y * gridColumnCount + x).coerceIn(0, totalApps - 1)
+                            if (newPosition != initialIndex) {
+                                onReorder(initialIndex, newPosition)
+                            }
+                            offset = Offset.Zero
                         }
-                        offset = Offset.Zero
                     }
-                }
-            )
+                )
+            }
+        } else {
+            Modifier
         }
-    } else {
-        Modifier
     }
 
+    // Main composable layout
     Box(
         modifier = modifier
-            .size(buttonSize.dp)  // Rozmiar przycisku
+            .size(buttonSize.dp)
             .padding(8.dp)
-            .then(dragModifier) // Dodanie modyfikatora drag, jeśli odblokowany
+            .then(dragModifier)
             .graphicsLayer(
                 translationX = offset.x,
                 translationY = offset.y,
@@ -143,3 +147,4 @@ fun Drawable.toBitmap(): Bitmap {
     draw(canvas)
     return bitmap
 }
+
