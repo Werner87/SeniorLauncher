@@ -3,11 +3,18 @@ package com.example.seniorapp
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ResolveInfo
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.provider.AlarmClock
 import android.provider.MediaStore
 import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -123,4 +130,74 @@ suspend fun loadAppPositions(context: Context): List<AppInfo> {
     }
 
     return installedApps
+}
+
+fun calculateNewPosition(
+    offset: Offset,
+    initialIndex: Int,
+    buttonSize: Int,
+    totalApps: Int
+): Int {
+    val gridWidth = 2 // Liczba kolumn w siatce
+    // Logi przesunięć
+    Log.d("calculateNewPosition", "Offset: $offset, ButtonSize: $buttonSize")
+    val rowOffset = ((offset.y + buttonSize / 2) / buttonSize).toInt()
+    val columnOffset = ((offset.x + buttonSize / 2) / buttonSize).toInt()
+    // Logi obliczeń wierszy i kolumn
+    Log.d("calculateNewPosition", "RowOffset: $rowOffset, ColumnOffset: $columnOffset")
+    val initialRow = initialIndex / gridWidth // Wiersz początkowy
+    val initialColumn = initialIndex % gridWidth // Kolumna początkowa
+
+    val newRow = initialRow + rowOffset // Nowy wiersz
+    val newColumn = initialColumn + columnOffset // Nowa kolumna
+
+    // Oblicz nowy indeks na podstawie wiersza i kolumny
+    val newIndex = newRow * gridWidth + newColumn
+    // Logi wynikowego indeksu
+    Log.d("calculateNewPosition", "InitialIndex: $initialIndex, NewIndex: $newIndex")
+
+    // Upewnij się, że indeks mieści się w zakresie
+    return newIndex.coerceIn(0, totalApps - 1)
+}
+
+suspend fun updateBackgroundColor(
+    context: Context,
+    color: Color,
+    onUpdateUI: (Color, Boolean) -> Unit
+) {
+    onUpdateUI(color, false) // Aktualizuj UI, ustawiając isImageBackground na false
+    context.dataStore.edit { preferences ->
+        preferences[BACKGROUND_COLOR_KEY] = color.toArgb().toLong()
+        preferences.remove(BACKGROUND_IMAGE_URI_KEY) // Usuń URI obrazu tła
+    }
+}
+
+suspend fun updateButtonSize(context: Context, size: Int, onUpdateUI: (Int) -> Unit) {
+    onUpdateUI(size) // Aktualizuj UI
+    context.dataStore.edit { preferences ->
+        preferences[BUTTON_SIZE_KEY] = size.toLong()
+    }
+}
+
+suspend fun setBackgroundImage(
+    context: Context,
+    bitmap: Bitmap?,
+    uri: String?,
+    onUpdateUI: (Bitmap?, Boolean) -> Unit
+) {
+    onUpdateUI(bitmap, bitmap != null) // Aktualizuj UI, ustawiając isImageBackground na true
+    uri?.let {
+        context.dataStore.edit { preferences ->
+            preferences[BACKGROUND_IMAGE_URI_KEY] = it
+            preferences.remove(BACKGROUND_COLOR_KEY) // Usuń zapisany kolor tła
+        }
+    }
+}
+
+fun Drawable.toBitmap(): Bitmap {
+    val bitmap = Bitmap.createBitmap(intrinsicWidth, intrinsicHeight, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    setBounds(0, 0, canvas.width, canvas.height)
+    draw(canvas)
+    return bitmap
 }

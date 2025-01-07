@@ -16,7 +16,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,9 +23,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Square
@@ -82,19 +78,6 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
     var backgroundImage by remember { mutableStateOf<Bitmap?>(null) }
     var isImageBackground by remember { mutableStateOf(false) }
 
-    fun setBackgroundImage(bitmap: Bitmap?) {
-        backgroundImage = bitmap
-        isImageBackground = bitmap != null
-    }
-
-    fun updateBackgroundImageUri(uri: String) {
-        scope.launch {
-            context.dataStore.edit { preferences ->
-                preferences[BACKGROUND_IMAGE_URI_KEY] = uri
-            }
-        }
-    }
-
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
         onResult = { uri ->
@@ -102,8 +85,13 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
                 try {
                     val inputStream = context.contentResolver.openInputStream(it)
                     val bitmap = BitmapFactory.decodeStream(inputStream)
-                    setBackgroundImage(bitmap)
-                    updateBackgroundImageUri(uri.toString())
+                    scope.launch {
+                        setBackgroundImage(context, bitmap, uri.toString()) { updatedBitmap, isImage ->
+                            backgroundImage = updatedBitmap
+                            isImageBackground = isImage
+                            selectedColor = Color.Transparent // Ustaw kolor na transparentny
+                        }
+                    }
                     inputStream?.close()
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -195,20 +183,6 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Choose background image button
-            OutlinedButton(
-                onClick = {
-                    imagePickerLauncher.launch("image/*")
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(1, 1, 3, 47))
-            ) {
-                Text(text = stringResource(id = R.string.choose_background_image), style = Typography.labelSmall, color = Color.Black)
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
             // Settings for main screen
             OutlinedButton(
                 onClick = {
@@ -223,38 +197,21 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
 
             Spacer(modifier = Modifier.height(30.dp))
 
-            Text(text = stringResource(id = R.string.background_color), style = Typography.bodyLarge, color = Color.Black)
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(6),
-                contentPadding = PaddingValues(15.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                items(listOf(
-                    Color.White to "White",
-                    Color.Gray to "Gray",
-                    Color(176, 224, 230) to "PowderBlue",
-                    Color(199, 21, 133) to "RedViolet",
-                    Color(255, 99, 71) to "Tomato",
-                    Color(255, 215, 0) to "Gold",
-                    Color(1, 182, 155, 255) to "Aqua",
-                    Color(9, 23, 143, 255) to "DarkBlue",
-                    Color(56, 129, 3, 255) to "Green",
-                    Color(139, 0, 0, 255) to "DarkRed",
-                    Color(103, 58, 183, 255) to "Purple",
-                    Color(189, 0, 0, 255) to "Red"
-                )) { (color, _) ->
-                    Box(
-                        modifier = Modifier
-                            .size(55.dp)
-                            .background(color)
-                            .clickable { updateBackgroundColor(color) }
-                            .padding(8.dp)
-                    )
+            BackgroundSection(
+                backgroundColor = selectedColor,
+                isImageBackground = isImageBackground,
+                backgroundImage = backgroundImage,
+                onPickImage = { imagePickerLauncher.launch("image/*") },
+                onColorSelected = { color ->
+                    scope.launch {
+                        updateBackgroundColor(context, color) { updatedColor, isImage ->
+                            selectedColor = updatedColor
+                            isImageBackground = isImage
+                            backgroundImage = null // Usuń obraz tła z UI
+                        }
+                    }
                 }
-            }
+            )
 
             Spacer(modifier = Modifier.height(30.dp))
 
