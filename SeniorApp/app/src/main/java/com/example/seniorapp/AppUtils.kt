@@ -12,6 +12,8 @@ import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -114,50 +116,75 @@ suspend fun saveAppPositions(context: Context, appPositions: List<AppInfo>) {
     preferences.edit { it[APP_POSITION_KEY] = serializedAppPositions }
 }
 
-suspend fun loadAppPositions(context: Context): List<AppInfo> {
+suspend fun loadAppPositions(context: Context): SnapshotStateList<AppInfo> {
     val preferences = context.dataStore
     val savedPositions = preferences.data.map { it[APP_POSITION_KEY] ?: "" }.first()
 
     val installedApps = fetchInstalledApps(context)
-    if (savedPositions.isNotEmpty()) {
+    val resultApps = if (savedPositions.isNotEmpty()) {
         val packageNames = savedPositions.split(",")
         val sortedApps = packageNames.mapNotNull { packageName ->
             installedApps.find { it.packageName == packageName }
         }
-
         val newApps = installedApps.filter { it.packageName !in packageNames }
-        return sortedApps + newApps
+        sortedApps + newApps
+    } else {
+        installedApps
     }
 
-    return installedApps
+    return mutableStateListOf(*resultApps.toTypedArray())
 }
 
-fun calculateNewPosition(
+
+fun calculateNewIndex(
     offset: Offset,
-    initialIndex: Int,
-    buttonSize: Int,
+    index: Int,
+    columnCount: Int,
+    buttonSizePx: Float,
     totalApps: Int
 ): Int {
-    val gridWidth = 2 // Liczba kolumn w siatce
-    // Logi przesunięć
-    Log.d("calculateNewPosition", "Offset: $offset, ButtonSize: $buttonSize")
-    val rowOffset = ((offset.y + buttonSize / 2) / buttonSize).toInt()
-    val columnOffset = ((offset.x + buttonSize / 2) / buttonSize).toInt()
-    // Logi obliczeń wierszy i kolumn
-    Log.d("calculateNewPosition", "RowOffset: $rowOffset, ColumnOffset: $columnOffset")
-    val initialRow = initialIndex / gridWidth // Wiersz początkowy
-    val initialColumn = initialIndex % gridWidth // Kolumna początkowa
+    val tag = "CalculateNewIndex"
 
-    val newRow = initialRow + rowOffset // Nowy wiersz
-    val newColumn = initialColumn + columnOffset // Nowa kolumna
+    // Oblicz przesunięcie w wierszach i kolumnach
+    val rowOffset = ((offset.y / buttonSizePx).coerceIn(-1f, 1f)).toInt()
+    val columnOffset = ((offset.x / buttonSizePx).coerceIn(-1f, 1f)).toInt()
 
-    // Oblicz nowy indeks na podstawie wiersza i kolumny
-    val newIndex = newRow * gridWidth + newColumn
-    // Logi wynikowego indeksu
-    Log.d("calculateNewPosition", "InitialIndex: $initialIndex, NewIndex: $newIndex")
+    // Obecne współrzędne w siatce
+    val currentRow = index / columnCount
+    val currentColumn = index % columnCount
 
-    // Upewnij się, że indeks mieści się w zakresie
-    return newIndex.coerceIn(0, totalApps - 1)
+    val newRow = (currentRow + rowOffset).coerceIn(0, (totalApps - 1) / columnCount)
+    val newColumn = (currentColumn + columnOffset).coerceIn(0, columnCount - 1)
+
+    // Obliczenie nowego indeksu
+    val newIndex = newRow * columnCount + newColumn
+
+    Log.d(tag, "Offset: $offset")
+    Log.d(tag, "RowOffset: $rowOffset, ColumnOffset: $columnOffset")
+    Log.d(tag, "CurrentRow: $currentRow, CurrentColumn: $currentColumn")
+    Log.d(tag, "NewRow: $newRow, NewColumn: $newColumn")
+    Log.d(tag, "NewIndex: $newIndex")
+
+    // Sprawdzenie, czy indeks jest w granicach listy
+    return if (newIndex in 0 until totalApps) {
+        Log.d(tag, "NewIndex calculated: $newIndex")
+        newIndex
+    } else {
+        Log.w(tag, "NewIndex out of bounds: $newIndex")
+        index
+    }
+}
+fun updateIconsOnDrag(
+    apps: MutableList<AppInfo>,
+    fromIndex: Int,
+    toIndex: Int
+) {
+    if (fromIndex != toIndex && fromIndex in apps.indices && toIndex in apps.indices) {
+        val draggedApp = apps[fromIndex]
+        apps.removeAt(fromIndex)
+        apps.add(toIndex, draggedApp)
+        Log.d("AppUtils", "Icons updated: fromIndex=$fromIndex, toIndex=$toIndex")
+    }
 }
 
 suspend fun updateBackgroundColor(

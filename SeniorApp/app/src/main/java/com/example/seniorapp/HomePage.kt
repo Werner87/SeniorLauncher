@@ -7,6 +7,7 @@ import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -20,10 +21,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,8 +42,8 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    var installedApps by remember { mutableStateOf(emptyList<AppInfo>()) }
-    var filteredApps by remember { mutableStateOf(emptyList<AppInfo>()) }
+    val installedApps = remember { mutableStateListOf<AppInfo>()}
+    var filteredApps by remember { mutableStateOf(installedApps.toList()) }
     var searchText by remember { mutableStateOf("") }
     var isDraggingLocked by remember { mutableStateOf(true) }
     val currentTime = remember { mutableStateOf("") }
@@ -66,8 +69,10 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
                 val action = intent.action
                 if (action == Intent.ACTION_PACKAGE_ADDED || action == Intent.ACTION_PACKAGE_REMOVED ||
                     action == Intent.ACTION_PACKAGE_CHANGED) {
-                    installedApps = fetchInstalledApps(context)
-                    filteredApps = installedApps.filter { it.label.contains(searchText, ignoreCase = true) }
+                    val fetchedApps = fetchInstalledApps(context)
+                    installedApps.clear()
+                    installedApps.addAll(fetchedApps)
+                    filteredApps = fetchedApps.filter { it.label.contains(searchText, ignoreCase = true) }
                 }
             }
         }
@@ -76,8 +81,11 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
     LaunchedEffect(Unit) {
 
         clockManager.startClock()
-        installedApps = loadAppPositions(context)
-        filteredApps = installedApps
+        val fetchedApps = loadAppPositions(context)
+        installedApps.clear()
+        installedApps.addAll(fetchedApps)
+        filteredApps = fetchedApps
+
         context.registerReceiver(packageChangedReceiver, IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED)
             addAction(Intent.ACTION_PACKAGE_REMOVED)
@@ -106,6 +114,13 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
         }
     }
 
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .collect { index ->
+                Log.d("AppGrid", "First visible item index: $index")
+            }
+    }
+
     LaunchedEffect(searchText) {
         filteredApps = installedApps.filter { it.label.contains(searchText, ignoreCase = true) }
     }
@@ -128,6 +143,17 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
         onDispose {
             clockManager.stopClock()
             context.unregisterReceiver(packageChangedReceiver)
+        }
+    }
+
+    val onReorder: (Int, Int) -> Unit = { fromIndex, toIndex ->
+        Log.d("AppGrid", "Reordering item: fromIndex=$fromIndex toIndex=$toIndex")
+        if (fromIndex in installedApps.indices && toIndex in installedApps.indices) {
+            updateIconsOnDrag(installedApps, fromIndex, toIndex)
+            filteredApps = installedApps.toList() // Odśwież siatkę
+            coroutineScope.launch {
+                saveAppPositions(context, installedApps)
+            }
         }
     }
 
@@ -163,18 +189,9 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
 
             AppGrid(
                 listState = listState,
-                apps = filteredApps,
+                installedApps = filteredApps,
                 isDraggingLocked = isDraggingLocked,
-                onReorder = { fromIndex, toIndex ->
-                    val updatedApps = installedApps.toMutableList()
-                    val draggedApp = updatedApps.removeAt(fromIndex)
-                    updatedApps.add(toIndex, draggedApp)
-                    installedApps = updatedApps
-                    filteredApps = updatedApps.filter { it.label.contains(searchText, ignoreCase = true) }
-                    coroutineScope.launch {
-                        saveAppPositions(context, updatedApps)
-                    }
-                },
+                onReorder = onReorder,
                 buttonSize = buttonSize,
                 onDeleteClick = {appInfo ->
                     promptUninstallApp(context,appInfo.packageName)

@@ -1,8 +1,6 @@
 package com.example.seniorapp
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.drawable.Drawable
+import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -35,8 +33,9 @@ fun AppButton(
     appInfo: AppInfo,
     onClick: () -> Unit,
     isDraggingLocked: Boolean,
-    index: Int,
     totalApps: Int,
+    apps: List<AppInfo>,
+    index: Int,
     buttonSize: Int,
     onReorder: (Int, Int) -> Unit,
     onDeleteClick: () -> Unit,
@@ -60,8 +59,9 @@ fun AppButton(
             Modifier.pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = {
-                        initialIndex = index
-                        coroutineScope.launch { scale.animateTo(1.1f, animationSpec = tween(150)) }
+                        coroutineScope.launch {
+                            scale.animateTo(1.1f, animationSpec = tween(150))
+                        }
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
@@ -71,20 +71,19 @@ fun AppButton(
                         coroutineScope.launch {
                             scale.animateTo(1f, animationSpec = tween(150))
                         }
-
-                        val newIndex = calculateNewPosition(offset, index, buttonSize, totalApps)
+                        val newIndex = calculateNewIndex(
+                            offset = offset,
+                            index = index,
+                            columnCount = 2,
+                            buttonSizePx = buttonSize.dp.toPx(),
+                            totalApps = totalApps
+                        )
                         if (newIndex != index) {
+                            Log.d("AppButton", "Moving item from $index to $newIndex")
                             onReorder(index, newIndex)
                         }
-
                         offset = Offset.Zero
                     },
-                    onDragCancel = {
-                        coroutineScope.launch {
-                            scale.animateTo(1f, animationSpec = tween(150))
-                        }
-                        offset = Offset.Zero
-                    }
                 )
             }
         } else {
