@@ -1,9 +1,5 @@
 package com.example.seniorapp
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -51,7 +47,7 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
     var isDeleting by remember { mutableStateOf(false) }
     var backgroundImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isImageBackground by remember { mutableStateOf(false) }
-    var backgroundColor by remember { mutableStateOf(Color.White) } // Deklaracja backgroundColor
+    var backgroundColor by remember { mutableStateOf(Color.White) }
     val listState = rememberLazyGridState()
     val isScrolled by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
 
@@ -63,37 +59,33 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
         .map { preferences -> preferences[BUTTON_SIZE_KEY]?.toInt() ?: 150 }
         .collectAsState(initial = 150)
 
-    val packageChangedReceiver = remember {
-        object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                val action = intent.action
-                if (action == Intent.ACTION_PACKAGE_ADDED || action == Intent.ACTION_PACKAGE_REMOVED ||
-                    action == Intent.ACTION_PACKAGE_CHANGED) {
-                    val fetchedApps = fetchInstalledApps(context)
-                    installedApps.clear()
-                    installedApps.addAll(fetchedApps)
-                    filteredApps = fetchedApps.filter { it.label.contains(searchText, ignoreCase = true) }
-                }
-            }
+    val appChangeHandler = remember {
+        AppChangeHandler(context) { updatedApps ->
+            installedApps.clear()
+            installedApps.addAll(updatedApps)
+            filteredApps = updatedApps.filter { it.label.contains(searchText, ignoreCase = true) }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        appChangeHandler.register()
+        clockManager.startClock()
+
+        onDispose {
+            appChangeHandler.unregister()
+            clockManager.stopClock()
         }
     }
 
     LaunchedEffect(Unit) {
 
+        appChangeHandler.register()
         clockManager.startClock()
         val fetchedApps = loadAppPositions(context)
         installedApps.clear()
         installedApps.addAll(fetchedApps)
         filteredApps = fetchedApps
 
-        context.registerReceiver(packageChangedReceiver, IntentFilter().apply {
-            addAction(Intent.ACTION_PACKAGE_ADDED)
-            addAction(Intent.ACTION_PACKAGE_REMOVED)
-            addAction(Intent.ACTION_PACKAGE_CHANGED)
-            addDataScheme("package")
-        })
-
-        // Load background settings
         val savedColor = context.dataStore.data.firstOrNull()?.get(BACKGROUND_COLOR_KEY)?.let { Color(it) } ?: Color.White
         val savedImageUri = context.dataStore.data.firstOrNull()?.get(BACKGROUND_IMAGE_URI_KEY)
 
@@ -139,13 +131,6 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
         }
     }
 
-    DisposableEffect(Unit) {
-        onDispose {
-            clockManager.stopClock()
-            context.unregisterReceiver(packageChangedReceiver)
-        }
-    }
-
     val onReorder: (Int, Int) -> Unit = { fromIndex, toIndex ->
         Log.d("AppGrid", "Reordering item: fromIndex=$fromIndex toIndex=$toIndex")
         if (fromIndex in installedApps.indices && toIndex in installedApps.indices) {
@@ -180,9 +165,9 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
                 onNavigateToSettings = onNavigateToSettings,
                 isDraggingLocked = isDraggingLocked,
                 isDeleting = isDeleting,
-                isScrolled = isScrolled, // Przekazanie `isScrolled`
-                searchText = searchText, // Przekazanie `searchText`
-                onSearchTextChanged = { searchText = it }, // Aktualizacja `searchText`
+                isScrolled = isScrolled,
+                searchText = searchText,
+                onSearchTextChanged = { searchText = it },
                 onLockToggle = { isDraggingLocked = !isDraggingLocked },
                 onDeleteToggle = { isDeleting = !isDeleting }
             )

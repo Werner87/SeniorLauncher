@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -30,6 +31,7 @@ fun NavBar(
     onNavigateToSettings: () -> Unit,
     isDraggingLocked: Boolean,
     isDeleting: Boolean,
+    iconSize: Int = 48,
     isScrolled: Boolean, // Dodano
     searchText: String, // Dodano
     onSearchTextChanged: (String) -> Unit, // Dodano
@@ -54,17 +56,20 @@ fun NavBar(
         AnimatedIcon(
             imageVector = if (isDraggingLocked) Icons.Filled.Lock else Icons.Filled.LockOpen,
             contentDescription = if (isDraggingLocked) "Unlock" else "Lock",
-            onClick = { onLockToggle() }
+            onClick = { onLockToggle() },
+            modifier = Modifier.size(iconSize.dp)
         )
         AnimatedIcon(
             imageVector = if (isDeleting) Icons.Filled.Delete else Icons.Filled.DeleteOutline,
             contentDescription = "Delete",
-            onClick = { onDeleteToggle() }
+            onClick = { onDeleteToggle() },
+            modifier = Modifier.size(iconSize.dp)
         )
         AnimatedIcon(
             imageVector = Icons.Filled.Settings,
             contentDescription = "Settings",
-            onClick = { onNavigateToSettings() }
+            onClick = { onNavigateToSettings() },
+            modifier = Modifier.size(iconSize.dp)
         )
     }
 

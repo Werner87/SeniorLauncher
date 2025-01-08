@@ -42,11 +42,10 @@ fun AnimatedIcon(
             .size(40.dp)
             .scale(scaleAnim)
             .clickable {
-                // Uruchamiamy animację w CoroutineScope
                 coroutineScope.launch {
                     scale = 1.1f
-                    delay(150) // Czekamy na zakończenie animacji powiększenia
-                    scale = 1f // Powrót do oryginalnego rozmiaru
+                    delay(150)
+                    scale = 1f
                 }
                 onClick()
             },

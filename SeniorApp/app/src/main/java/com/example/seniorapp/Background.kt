@@ -1,6 +1,5 @@
 package com.example.seniorapp
 
-import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -27,9 +26,6 @@ import com.example.seniorapp.ui.theme.Typography
 
 @Composable
 fun BackgroundSection(
-    backgroundColor: Color,
-    isImageBackground: Boolean,
-    backgroundImage: Bitmap?,
     onPickImage: () -> Unit,
     onColorSelected: (Color) -> Unit
 ) {

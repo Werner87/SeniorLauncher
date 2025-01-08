@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -26,6 +25,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.launch
 
 @Composable
@@ -34,7 +34,6 @@ fun AppButton(
     onClick: () -> Unit,
     isDraggingLocked: Boolean,
     totalApps: Int,
-    apps: List<AppInfo>,
     index: Int,
     buttonSize: Int,
     onReorder: (Int, Int) -> Unit,
@@ -44,8 +43,8 @@ fun AppButton(
 ) {
     val context = LocalContext.current
     var offset by remember { mutableStateOf(Offset.Zero) }
-    var initialIndex by remember { mutableIntStateOf(index) }
     val scale = remember { Animatable(1f) }
+    var isDragging by remember { mutableStateOf(false) }
 
     val appIconDrawable = remember(appInfo.packageName) {
         context.packageManager.getApplicationIcon(appInfo.packageName)
@@ -59,6 +58,7 @@ fun AppButton(
             Modifier.pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = {
+                        isDragging = true
                         coroutineScope.launch {
                             scale.animateTo(1.1f, animationSpec = tween(150))
                         }
@@ -68,6 +68,7 @@ fun AppButton(
                         offset += dragAmount
                     },
                     onDragEnd = {
+                        isDragging = false
                         coroutineScope.launch {
                             scale.animateTo(1f, animationSpec = tween(150))
                         }
@@ -91,10 +92,10 @@ fun AppButton(
         }
     }
 
-    // Main composable layout
     Box(
         modifier = modifier
             .size(buttonSize.dp)
+            .zIndex(if(isDragging) 1f else 0f )
             .then(dragModifier)
             .graphicsLayer(
                 translationX = offset.x,

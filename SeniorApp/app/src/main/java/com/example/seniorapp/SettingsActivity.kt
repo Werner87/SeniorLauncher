@@ -198,20 +198,16 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
             Spacer(modifier = Modifier.height(30.dp))
 
             BackgroundSection(
-                backgroundColor = selectedColor,
-                isImageBackground = isImageBackground,
-                backgroundImage = backgroundImage,
-                onPickImage = { imagePickerLauncher.launch("image/*") },
-                onColorSelected = { color ->
-                    scope.launch {
-                        updateBackgroundColor(context, color) { updatedColor, isImage ->
-                            selectedColor = updatedColor
-                            isImageBackground = isImage
-                            backgroundImage = null // Usuń obraz tła z UI
-                        }
+                onPickImage = { imagePickerLauncher.launch("image/*") }
+            ) { color ->
+                scope.launch {
+                    updateBackgroundColor(context, color) { updatedColor, isImage ->
+                        selectedColor = updatedColor
+                        isImageBackground = isImage
+                        backgroundImage = null // Usuń obraz tła z UI
                     }
                 }
-            )
+            }
 
             Spacer(modifier = Modifier.height(30.dp))
 
@@ -224,7 +220,7 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                buttonSizeOptions.forEachIndexed { index, size ->
+                buttonSizeOptions.forEachIndexed { _, size ->
                     Box(
                         modifier = Modifier
                             .size(50.dp)
