@@ -1,9 +1,7 @@
 package com.example.seniorapp
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.drawable.Drawable
-import androidx.compose.animation.core.animateFloatAsState
+import android.util.Log
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -11,12 +9,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -29,20 +24,17 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 @Composable
 fun AppButton(
     appInfo: AppInfo,
     onClick: () -> Unit,
     isDraggingLocked: Boolean,
-    index: Int,
-    gridColumnCount: Int,
     totalApps: Int,
+    index: Int,
     buttonSize: Int,
     onReorder: (Int, Int) -> Unit,
     onDeleteClick: () -> Unit,
@@ -50,16 +42,9 @@ fun AppButton(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val density = LocalDensity.current
     var offset by remember { mutableStateOf(Offset.Zero) }
-    var initialIndex by remember { mutableIntStateOf(index) }
-    var scale by remember { mutableFloatStateOf(1f) }
-
-    val scaleAnim by animateFloatAsState(
-        targetValue = scale,
-        animationSpec = tween(durationMillis = 150),
-        label = "scaleAnimation"
-    )
+    val scale = remember { Animatable(1f) }
+    var isDragging by remember { mutableStateOf(false) }
 
     val appIconDrawable = remember(appInfo.packageName) {
         context.packageManager.getApplicationIcon(appInfo.packageName)
@@ -68,54 +53,63 @@ fun AppButton(
 
     val coroutineScope = rememberCoroutineScope()
 
-    val dragModifier = if (!isDraggingLocked) {
-        Modifier.pointerInput(Unit) {
-            detectDragGestures(
-                onDragStart = {
-                    initialIndex = index
-                    coroutineScope.launch { scale = 1.1f }
-                },
-                onDrag = { change, dragAmount ->
-                    change.consume()
-                    offset += dragAmount
-                },
-                onDragEnd = {
-                    coroutineScope.launch { scale = 1f }
-                    with(density) {
-                        val x = (offset.x / (160.dp.toPx())).roundToInt()
-                        val y = (offset.y / (160.dp.toPx())).roundToInt()
-                        val newPosition = (initialIndex + y * gridColumnCount + x).coerceIn(0, totalApps - 1)
-                        if (newPosition != initialIndex) {
-                            onReorder(initialIndex, newPosition)
+    val dragModifier = remember(isDraggingLocked) {
+        if (!isDraggingLocked) {
+            Modifier.pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = {
+                        isDragging = true
+                        coroutineScope.launch {
+                            scale.animateTo(1.1f, animationSpec = tween(150))
+                        }
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        offset += dragAmount
+                    },
+                    onDragEnd = {
+                        isDragging = false
+                        coroutineScope.launch {
+                            scale.animateTo(1f, animationSpec = tween(150))
+                        }
+                        val newIndex = calculateNewIndex(
+                            offset = offset,
+                            index = index,
+                            columnCount = 2,
+                            buttonSizePx = buttonSize.dp.toPx(),
+                            totalApps = totalApps
+                        )
+                        if (newIndex != index) {
+                            Log.d("AppButton", "Moving item from $index to $newIndex")
+                            onReorder(index, newIndex)
                         }
                         offset = Offset.Zero
-                    }
-                }
-            )
+                    },
+                )
+            }
+        } else {
+            Modifier
         }
-    } else {
-        Modifier
     }
 
     Box(
         modifier = modifier
-            .size(buttonSize.dp)  // Rozmiar przycisku
-            .padding(8.dp)
-            .then(dragModifier) // Dodanie modyfikatora drag, jeśli odblokowany
+            .size(buttonSize.dp)
+            .zIndex(if(isDragging) 1f else 0f )
+            .then(dragModifier)
             .graphicsLayer(
                 translationX = offset.x,
                 translationY = offset.y,
-                scaleX = scaleAnim,
-                scaleY = scaleAnim
+                scaleX = scale.value,
+                scaleY = scale.value,
             )
             .clickable {
                 coroutineScope.launch {
                     if (isDeleting) {
                         onDeleteClick()
                     } else {
-                        scale = 1.1f
-                        delay(150)
-                        scale = 1f
+                        scale.animateTo(1.2f, animationSpec = tween(150))
+                        scale.animateTo(1f, animationSpec = tween(150))
                         onClick()
                     }
                 }
@@ -124,7 +118,6 @@ fun AppButton(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
                 .background(Color.Transparent)
         ) {
             Image(
@@ -136,10 +129,5 @@ fun AppButton(
     }
 }
 
-fun Drawable.toBitmap(): Bitmap {
-    val bitmap = Bitmap.createBitmap(intrinsicWidth, intrinsicHeight, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    setBounds(0, 0, canvas.width, canvas.height)
-    draw(canvas)
-    return bitmap
-}
+
+

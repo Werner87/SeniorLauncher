@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -26,7 +26,7 @@ fun AnimatedIcon(
     modifier: Modifier = Modifier,
     tint: Color = Color.Black
 ) {
-    var scale by remember { mutableStateOf(1f) }
+    var scale by remember { mutableFloatStateOf(1f) }
     val scaleAnim by animateFloatAsState(
         targetValue = scale,
         animationSpec = tween(durationMillis = 150),
@@ -42,11 +42,10 @@ fun AnimatedIcon(
             .size(40.dp)
             .scale(scaleAnim)
             .clickable {
-                // Uruchamiamy animację w CoroutineScope
                 coroutineScope.launch {
                     scale = 1.1f
-                    delay(150) // Czekamy na zakończenie animacji powiększenia
-                    scale = 1f // Powrót do oryginalnego rozmiaru
+                    delay(150)
+                    scale = 1f
                 }
                 onClick()
             },

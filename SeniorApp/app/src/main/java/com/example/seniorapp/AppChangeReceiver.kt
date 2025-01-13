@@ -5,28 +5,34 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 
-class AppChangeReceiver(
-    private val onAppChanged: () -> Unit
-) : BroadcastReceiver() {
+class AppChangeHandler(
+    private val context: Context,
+    private val onAppListUpdated: (List<AppInfo>) -> Unit
+) {
 
-    override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_PACKAGE_ADDED ||
-            intent.action == Intent.ACTION_PACKAGE_REMOVED) {
-            // Kiedy aplikacja jest zainstalowana lub usunięta
-            onAppChanged()
+    private val appChangeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val action = intent.action
+            if (action == Intent.ACTION_PACKAGE_ADDED ||
+                action == Intent.ACTION_PACKAGE_REMOVED ||
+                action == Intent.ACTION_PACKAGE_CHANGED) {
+                val updatedApps = fetchInstalledApps(context)
+                onAppListUpdated(updatedApps)
+            }
         }
     }
 
-    fun register(context: Context) {
+    fun register() {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED)
             addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_CHANGED)
             addDataScheme("package")
         }
-        context.registerReceiver(this, filter)
+        context.registerReceiver(appChangeReceiver, filter)
     }
 
-    fun unregister(context: Context) {
-        context.unregisterReceiver(this)
+    fun unregister() {
+        context.unregisterReceiver(appChangeReceiver)
     }
 }

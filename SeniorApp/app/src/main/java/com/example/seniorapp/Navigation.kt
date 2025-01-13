@@ -19,14 +19,12 @@ fun AppNavHost(navController: NavHostController) {
         composable(
             "home",
             enterTransition = {
-                // Fade in with a smooth slide-in from the right
                 fadeIn(tween(500)) + slideInHorizontally(
                     initialOffsetX = { 500 }, // Slide from the right
                     animationSpec = tween(500)
                 )
             },
             exitTransition = {
-                // Fade out with a smooth slide-out to the left
                 fadeOut(tween(500)) + slideOutHorizontally(
                     targetOffsetX = { -500 }, // Slide to the left
                     animationSpec = tween(500)
@@ -40,14 +38,12 @@ fun AppNavHost(navController: NavHostController) {
         composable(
             "settings",
             enterTransition = {
-                // Fade in with a smooth slide-in from the right
                 fadeIn(tween(500)) + slideInHorizontally(
                     initialOffsetX = { 500 }, // Slide from the right
                     animationSpec = tween(500)
                 )
             },
             exitTransition = {
-                // Fade out with a smooth slide-out to the left
                 fadeOut(tween(500)) + slideOutHorizontally(
                     targetOffsetX = { -500 }, // Slide to the left
                     animationSpec = tween(500)
