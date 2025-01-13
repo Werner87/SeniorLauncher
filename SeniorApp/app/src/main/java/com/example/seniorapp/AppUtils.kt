@@ -30,7 +30,6 @@ fun promptUninstallApp(context: Context, packageName: String) {
 fun fetchInstalledApps(context: Context): List<AppInfo> {
     val packageManager = context.packageManager
 
-    // Pobieramy listę wszystkich aplikacji, które można uruchomić
     val apps = packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).apply {
         addCategory(Intent.CATEGORY_LAUNCHER)
     }, 0)
@@ -145,18 +144,15 @@ fun calculateNewIndex(
 ): Int {
     val tag = "CalculateNewIndex"
 
-    // Oblicz przesunięcie w wierszach i kolumnach
     val rowOffset = ((offset.y / buttonSizePx).coerceIn(-1f, 1f)).toInt()
     val columnOffset = ((offset.x / buttonSizePx).coerceIn(-1f, 1f)).toInt()
 
-    // Obecne współrzędne w siatce
     val currentRow = index / columnCount
     val currentColumn = index % columnCount
 
     val newRow = (currentRow + rowOffset).coerceIn(0, (totalApps - 1) / columnCount)
     val newColumn = (currentColumn + columnOffset).coerceIn(0, columnCount - 1)
 
-    // Obliczenie nowego indeksu
     val newIndex = newRow * columnCount + newColumn
 
     Log.d(tag, "Offset: $offset")
@@ -165,7 +161,6 @@ fun calculateNewIndex(
     Log.d(tag, "NewRow: $newRow, NewColumn: $newColumn")
     Log.d(tag, "NewIndex: $newIndex")
 
-    // Sprawdzenie, czy indeks jest w granicach listy
     return if (newIndex in 0 until totalApps) {
         Log.d(tag, "NewIndex calculated: $newIndex")
         newIndex
@@ -192,17 +187,10 @@ suspend fun updateBackgroundColor(
     color: Color,
     onUpdateUI: (Color, Boolean) -> Unit
 ) {
-    onUpdateUI(color, false) // Aktualizuj UI, ustawiając isImageBackground na false
+    onUpdateUI(color, false)
     context.dataStore.edit { preferences ->
         preferences[BACKGROUND_COLOR_KEY] = color.toArgb().toLong()
-        preferences.remove(BACKGROUND_IMAGE_URI_KEY) // Usuń URI obrazu tła
-    }
-}
-
-suspend fun updateButtonSize(context: Context, size: Int, onUpdateUI: (Int) -> Unit) {
-    onUpdateUI(size) // Aktualizuj UI
-    context.dataStore.edit { preferences ->
-        preferences[BUTTON_SIZE_KEY] = size.toLong()
+        preferences.remove(BACKGROUND_IMAGE_URI_KEY)
     }
 }
 
@@ -212,11 +200,11 @@ suspend fun setBackgroundImage(
     uri: String?,
     onUpdateUI: (Bitmap?, Boolean) -> Unit
 ) {
-    onUpdateUI(bitmap, bitmap != null) // Aktualizuj UI, ustawiając isImageBackground na true
+    onUpdateUI(bitmap, bitmap != null)
     uri?.let {
         context.dataStore.edit { preferences ->
             preferences[BACKGROUND_IMAGE_URI_KEY] = it
-            preferences.remove(BACKGROUND_COLOR_KEY) // Usuń zapisany kolor tła
+            preferences.remove(BACKGROUND_COLOR_KEY)
         }
     }
 }

@@ -135,7 +135,7 @@ fun HomePage(onNavigateToSettings: () -> Unit) {
         Log.d("AppGrid", "Reordering item: fromIndex=$fromIndex toIndex=$toIndex")
         if (fromIndex in installedApps.indices && toIndex in installedApps.indices) {
             updateIconsOnDrag(installedApps, fromIndex, toIndex)
-            filteredApps = installedApps.toList() // Odśwież siatkę
+            filteredApps = installedApps.toList()
             coroutineScope.launch {
                 saveAppPositions(context, installedApps)
             }

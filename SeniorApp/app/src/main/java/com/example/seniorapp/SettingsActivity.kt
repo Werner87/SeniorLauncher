@@ -61,7 +61,6 @@ class SettingsActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             SettingsScreen(onBackPressed = {
-                // Use the new OnBackPressedDispatcher API
                 onBackPressedDispatcher.onBackPressed()
             })
         }
@@ -72,7 +71,7 @@ class SettingsActivity : ComponentActivity() {
 fun SettingsScreen(onBackPressed: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val buttonSizeOptions = listOf(120, 150, 170) // Rozmiary przycisków w dp
+    val buttonSizeOptions = listOf(120, 150, 170)
     var selectedColor by remember { mutableStateOf(Color.White) }
     var selectedButtonSize by remember { mutableIntStateOf(buttonSizeOptions[1]) }
     var backgroundImage by remember { mutableStateOf<Bitmap?>(null) }
@@ -89,7 +88,7 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
                         setBackgroundImage(context, bitmap, uri.toString()) { updatedBitmap, isImage ->
                             backgroundImage = updatedBitmap
                             isImageBackground = isImage
-                            selectedColor = Color.Transparent // Ustaw kolor na transparentny
+                            selectedColor = Color.Transparent
                         }
                     }
                     inputStream?.close()
@@ -100,7 +99,6 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
         }
     )
 
-    // Fetch and set initial color
     LaunchedEffect(Unit) {
         val colorValue = context.dataStore.data.first()[BACKGROUND_COLOR_KEY] ?: Color.White.toArgb().toLong()
         selectedColor = Color(colorValue)
@@ -127,16 +125,6 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
         }
         .collectAsState(initial = Color.White)
 
-    fun updateBackgroundColor(color: Color) {
-        selectedColor = color // Immediately update UI
-        isImageBackground = false
-        scope.launch {
-            context.dataStore.edit { preferences ->
-                preferences[BACKGROUND_COLOR_KEY] = color.toArgb().toLong()
-            }
-        }
-    }
-
     fun updateButtonSize(size: Int) {
         selectedButtonSize = size
         scope.launch {
@@ -151,7 +139,6 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
             .fillMaxSize()
             .background(if (isImageBackground) Color.Transparent else backgroundColor)
     ) {
-        // Wyświetlanie obrazu tła tylko, gdy isImageBackground jest true
         if (isImageBackground && backgroundImage != null) {
             Image(
                 bitmap = backgroundImage!!.asImageBitmap(),
@@ -167,7 +154,6 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header with back button
             Box(modifier = Modifier.fillMaxWidth()) {
                 IconButton(onClick = { onBackPressed() }) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -183,7 +169,6 @@ fun SettingsScreen(onBackPressed: () -> Unit) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Settings for main screen
             OutlinedButton(
                 onClick = {
                     context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))

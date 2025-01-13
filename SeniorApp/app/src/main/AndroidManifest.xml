@@ -36,9 +36,9 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.SeniorApp">
+            android:theme="@style/Theme.SeniorApp"
+            tools:ignore="LockedOrientationActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -50,7 +50,8 @@
             android:name=".SettingsActivity"
             android:label="Settings"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.SeniorApp" />
+            android:theme="@style/Theme.SeniorApp"
+            tools:ignore="LockedOrientationActivity" />
     </application>
 
 </manifest>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LanzadorSenior</string>
+    <string name="settings">Configuración</string>
+    <string name="choose_background_image">Elegir imagen de fondo</string>
+    <string name="choose_home_screen">Elegir pantalla de inicio</string>
+    <string name="change_language">Cambiar idioma</string>
+    <string name="background_color">Color de fondo</string>
+    <string name="button_size">Tamaño del botón</string>
+    <string name="small">Pequeño</string>
+    <string name="medium">Mediano</string>
+    <string name="large">Grande</string>
+    <string name="search">Buscar aplicaciones…</string>
+</resources>

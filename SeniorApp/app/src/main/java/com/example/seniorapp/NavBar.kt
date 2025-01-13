@@ -32,9 +32,9 @@ fun NavBar(
     isDraggingLocked: Boolean,
     isDeleting: Boolean,
     iconSize: Int = 48,
-    isScrolled: Boolean, // Dodano
-    searchText: String, // Dodano
-    onSearchTextChanged: (String) -> Unit, // Dodano
+    isScrolled: Boolean,
+    searchText: String,
+    onSearchTextChanged: (String) -> Unit,
     onLockToggle: () -> Unit,
     onDeleteToggle: () -> Unit)
 {

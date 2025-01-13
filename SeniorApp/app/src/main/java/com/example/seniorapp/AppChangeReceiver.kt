@@ -16,7 +16,6 @@ class AppChangeHandler(
             if (action == Intent.ACTION_PACKAGE_ADDED ||
                 action == Intent.ACTION_PACKAGE_REMOVED ||
                 action == Intent.ACTION_PACKAGE_CHANGED) {
-                // Pobierz zaktualizowaną listę aplikacji
                 val updatedApps = fetchInstalledApps(context)
                 onAppListUpdated(updatedApps)
             }
